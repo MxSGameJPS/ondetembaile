@@ -2,18 +2,18 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const SENDER_EMAIL = 'Onde Tem Baile <onboarding@resend.dev>'; // Resend default testing domain or custom domain
+const SENDER_EMAIL = 'Aonde Tem Baile <onboarding@resend.dev>'; // Resend default testing domain or custom domain
 
 export async function sendWelcomeEmail(toEmail: string, producerName: string) {
   try {
     const data = await resend.emails.send({
       from: SENDER_EMAIL,
       to: [toEmail],
-      subject: 'Bem-vindo ao Onde Tem Baile! 🎉',
+      subject: 'Bem-vindo ao Aonde Tem Baile! 🎉',
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Onde Tem Baile</h1>
+            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Aonde Tem Baile</h1>
             <p style="color: #94a3b8; font-size: 14px;">A sua vitrine de eventos regionais pelo Brasil</p>
           </div>
           <div style="background-color: #1e293b; padding: 24px; border-radius: 8px; border: 1px solid #334155;">
@@ -25,7 +25,7 @@ export async function sendWelcomeEmail(toEmail: string, producerName: string) {
               Agora você pode cadastrar seus eventos, festas e bailes para que pessoas da sua região encontrem sua programação facilmente.
             </p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://ondetembaile.com.br/produtor/novo-evento" style="background-color: #f59e0b; color: #0f172a; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">
+              <a href="https://aondetembaile.com.br/produtor/novo-evento" style="background-color: #f59e0b; color: #0f172a; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">
                 Cadastrar Meu Primeiro Evento
               </a>
             </div>
@@ -52,7 +52,7 @@ export async function sendEventSubmittedEmail(toEmail: string, producerName: str
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Onde Tem Baile</h1>
+            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Aonde Tem Baile</h1>
           </div>
           <div style="background-color: #1e293b; padding: 24px; border-radius: 8px; border: 1px solid #334155;">
             <h2 style="color: #ffffff; margin-top: 0;">Evento cadastrado com sucesso!</h2>
@@ -95,7 +95,7 @@ export async function sendEventStatusEmail(
       ? `
         <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Onde Tem Baile</h1>
+            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Aonde Tem Baile</h1>
           </div>
           <div style="background-color: #1e293b; padding: 24px; border-radius: 8px; border: 1px solid #10b981;">
             <h2 style="color: #10b981; margin-top: 0;">Seu evento foi APROVADO e já está no ar! 🚀</h2>
@@ -106,7 +106,7 @@ export async function sendEventStatusEmail(
               Ele já está disponível no site para todos os usuários da sua região encontrarem e compartilharem.
             </p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://ondetembaile.com.br" style="background-color: #10b981; color: #ffffff; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">
+              <a href="https://aondetembaile.com.br" style="background-color: #10b981; color: #ffffff; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block;">
                 Ver Evento no Site
               </a>
             </div>
@@ -116,7 +116,7 @@ export async function sendEventStatusEmail(
       : `
         <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Onde Tem Baile</h1>
+            <h1 style="color: #f59e0b; font-size: 28px; margin: 0;">🪩 Aonde Tem Baile</h1>
           </div>
           <div style="background-color: #1e293b; padding: 24px; border-radius: 8px; border: 1px solid #ef4444;">
             <h2 style="color: #ef4444; margin-top: 0;">Seu evento não foi aprovado</h2>

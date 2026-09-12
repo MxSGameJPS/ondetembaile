@@ -3,10 +3,10 @@ import Navbar from '@/components/Navbar'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Onde Tem Baile | Divulgação de Eventos e Festas Regionais pelo Brasil',
+  title: 'Aonde Tem Baile | Divulgação de Eventos e Festas Regionais pelo Brasil',
   description:
     'Encontre e divulgue bailes, festas, shows e eventos regionais perto de você. Plataforma completa para produtores de eventos.',
-  keywords: ['baile', 'festas', 'eventos regionais', 'shows', 'onde tem baile', 'divulgação de eventos'],
+  keywords: ['baile', 'festas', 'eventos regionais', 'shows', 'aonde tem baile', 'divulgação de eventos'],
 }
 
 export default function RootLayout({
@@ -31,9 +31,9 @@ export default function RootLayout({
         >
           <div className="container">
             <p style={{ color: '#d1d5db', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              🪩 Onde Tem Baile — O portal de eventos regionais do Brasil
+              🪩 Aonde Tem Baile — O portal de eventos regionais do Brasil
             </p>
-            <p>© {new Date().getFullYear()} Onde Tem Baile. Todos os direitos reservados.</p>
+            <p>© {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.</p>
           </div>
         </footer>
       </body>

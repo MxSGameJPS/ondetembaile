@@ -176,7 +176,7 @@ export default function ProducerSignUpPage() {
                 onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
               />
               <span>
-                Li e aceito os <strong>Termos de Uso</strong> e Políticas de Privacidade do site Onde Tem Baile.
+                Li e aceito os <strong>Termos de Uso</strong> e Políticas de Privacidade do site Aonde Tem Baile.
               </span>
             </label>
           </div>

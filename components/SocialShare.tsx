@@ -14,7 +14,7 @@ export default function SocialShare({ title, url }: SocialShareProps) {
   const [copied, setCopied] = useState(false)
 
   const encodedUrl = encodeURIComponent(url)
-  const encodedText = encodeURIComponent(`Confira o evento "${title}" no Onde Tem Baile: ${url}`)
+  const encodedText = encodeURIComponent(`Confira o evento "${title}" no Aonde Tem Baile: ${url}`)
 
   const shareFacebook = () => {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`, '_blank')

@@ -71,7 +71,7 @@ export default function Navbar() {
             </div>
           </div>
           <div>
-            <div className={styles.logoTitle}>Onde Tem Baile</div>
+            <div className={styles.logoTitle}>Aonde Tem Baile</div>
             <div className={styles.logoSubtitle}>Eventos Regionais</div>
           </div>
         </Link>

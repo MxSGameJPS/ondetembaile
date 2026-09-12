@@ -108,7 +108,7 @@ export default function HomePage() {
           </div>
 
           <h1 className={styles.heroTitle}>
-            Descubra <span className="gradient-text">Onde Tem Baile</span> perto de você!
+            Descubra <span className="gradient-text">Aonde Tem Baile</span> perto de você!
           </h1>
           <p className={styles.heroSubtitle}>
             Encontre bailes, festas, fandangos e shows em qualquer cidade do Brasil.
