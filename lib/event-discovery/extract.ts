@@ -116,6 +116,19 @@ function getDomain(value: string) {
   }
 }
 
+function isFacebookDomain(domain: string) {
+  return domain === 'facebook.com' || domain.endsWith('.facebook.com') || domain === 'fb.com' || domain.endsWith('.fb.com')
+}
+
+function isFacebookEventUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return isFacebookDomain(url.hostname.toLowerCase()) && /\/events(?:\/|$)/i.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
 function resolvePublicAssetUrl(value: string | null, baseUrl: string) {
   if (!value) return null
 
@@ -377,7 +390,12 @@ function detectCategory(text: string) {
 }
 
 function resolveSourceType(url: string, fallback: DiscoverySource): DiscoverySource {
-  return getDomain(url).includes('reddit.com') ? 'reddit' : fallback
+  const domain = getDomain(url)
+
+  if (domain.includes('reddit.com')) return 'reddit'
+  if (isFacebookDomain(domain)) return 'facebook'
+
+  return fallback
 }
 
 async function fetchPublicPage(url: string) {
@@ -420,14 +438,19 @@ export async function normalizeBraveResult(
 
   const sourceDomain = getDomain(sourceUrl)
   const sourceType = resolveSourceType(sourceUrl, context.sourceType)
+  const facebookSource = isFacebookDomain(sourceDomain)
+  const facebookEvent = isFacebookEventUrl(sourceUrl)
   const braveText = decodeHtml(
     [result.title, result.description, ...(result.extra_snippets ?? [])].filter(Boolean).join(' ')
   )
 
-  const looksLikeEvent = EVENT_KEYWORDS.some((keyword) => braveText.toLowerCase().includes(keyword))
+  const looksLikeEvent =
+    facebookEvent ||
+    EVENT_KEYWORDS.some((keyword) => braveText.toLowerCase().includes(keyword))
   if (!looksLikeEvent) return null
 
-  const html = enrichFromPage ? await fetchPublicPage(sourceUrl) : null
+  // Facebook is intentionally discovery-only through Brave. Do not crawl Meta pages directly.
+  const html = enrichFromPage && !facebookSource ? await fetchPublicPage(sourceUrl) : null
   const jsonLdEvent = html ? extractJsonLdEvent(html) : null
   const location = jsonLdAddress(jsonLdEvent?.location)
 
@@ -487,6 +510,8 @@ export async function normalizeBraveResult(
   if (image) confidence += 5
   if (price) confidence += 4
   if (jsonLdEvent) confidence += 13
+  if (facebookSource) confidence += 4
+  if (facebookEvent) confidence += 8
 
   return {
     title: truncate(decodeHtml(rawTitle), 180),
