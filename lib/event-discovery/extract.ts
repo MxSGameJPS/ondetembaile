@@ -338,10 +338,55 @@ function chooseYear(monthIndex: number, day: number, explicitYear?: number) {
   return candidate.getTime() < now.getTime() - 7 * 86400000 ? now.getFullYear() + 1 : now.getFullYear()
 }
 
-function parseDateFromText(text: string, periodDays: number) {
+function hasExplicitCalendarYear(text: string) {
+  return /\b(?:19|20)\d{2}\b/.test(text)
+}
+
+function parseBraveAge(value?: string) {
+  if (!value) return null
+
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) return parsed
+
+  const relative = value
+    .trim()
+    .toLowerCase()
+    .match(/^(\d+(?:\.\d+)?)\s*(day|week|month|year)s?\s+ago$/)
+
+  if (!relative) return null
+
+  const amount = Number(relative[1])
+  const unit = relative[2]
+  const days =
+    unit === 'day'
+      ? amount
+      : unit === 'week'
+        ? amount * 7
+        : unit === 'month'
+          ? amount * 30.4375
+          : amount * 365.25
+
+  return new Date(Date.now() - days * 86400000)
+}
+
+function isClearlyStaleSymplaResult(result: BraveWebResult) {
+  const publishedAt = parseBraveAge(result.age ?? result.page_age)
+  if (!publishedAt) return false
+
+  const staleCutoff = Date.now() - 370 * 86400000
+  return publishedAt.getTime() < staleCutoff
+}
+
+function parseDateFromText(
+  text: string,
+  periodDays: number,
+  options: { requireExplicitYear?: boolean } = {}
+) {
   const numeric = text.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?(?:\s+(?:às?|as)?\s*(\d{1,2})(?::|h)(\d{2})?)?/i)
 
   if (numeric) {
+    if (options.requireExplicitYear && !numeric[3]) return null
+
     const day = Number(numeric[1])
     const monthIndex = Number(numeric[2]) - 1
     const year = chooseYear(monthIndex, day, numeric[3] ? Number(numeric[3]) : undefined)
@@ -357,6 +402,8 @@ function parseDateFromText(text: string, periodDays: number) {
   const named = text.match(namedPattern)
 
   if (named) {
+    if (options.requireExplicitYear && !named[3]) return null
+
     const day = Number(named[1])
     const monthIndex = MONTHS[named[2].toLowerCase()]
     const year = chooseYear(monthIndex, day, named[3] ? Number(named[3]) : undefined)
@@ -459,6 +506,7 @@ export async function normalizeBraveResult(
   const symplaEvent = isSymplaEventUrl(sourceUrl)
 
   if (symplaSource && !symplaEvent) return null
+  if (symplaSource && isClearlyStaleSymplaResult(result)) return null
 
   const braveText = decodeHtml(
     [result.title, result.description, ...(result.extra_snippets ?? [])].filter(Boolean).join(' ')
@@ -506,7 +554,12 @@ export async function normalizeBraveResult(
       : null
 
   const dateText = `${braveText} ${rawTitle} ${rawDescription}`
-  const eventDate = structuredDate ?? parseDateFromText(dateText, context.periodDays)
+  const sourceHasExplicitYear = hasExplicitCalendarYear(dateText)
+  const eventDate =
+    structuredDate ??
+    parseDateFromText(dateText, context.periodDays, {
+      requireExplicitYear: symplaSource,
+    })
   const rawImage =
     jsonLdImage(jsonLdEvent?.image) ||
     pageImage ||
@@ -572,6 +625,11 @@ export async function normalizeBraveResult(
       enrichment: {
         fetched: Boolean(html),
         json_ld_event: Boolean(jsonLdEvent),
+      },
+      date: {
+        source_explicit_year: sourceHasExplicitYear,
+        inferred_without_year: Boolean(eventDate && !structuredDate && !sourceHasExplicitYear),
+        policy: symplaSource ? 'sympla-explicit-year-required' : 'default',
       },
     },
   }

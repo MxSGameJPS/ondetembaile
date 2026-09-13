@@ -180,6 +180,47 @@ function symplaResultScore(
   return score
 }
 
+function hasExplicitYearInCandidateSource(candidate: EventDiscoveryCandidate) {
+  return /\b(?:19|20)\d{2}\b/.test(
+    `${candidate.source_title || ''} ${candidate.source_snippet || ''}`
+  )
+}
+
+function candidateDateMetadata(candidate: EventDiscoveryCandidate) {
+  const rawData =
+    candidate.raw_data && typeof candidate.raw_data === 'object'
+      ? candidate.raw_data
+      : {}
+  const date =
+    'date' in rawData && rawData.date && typeof rawData.date === 'object'
+      ? (rawData.date as Record<string, unknown>)
+      : {}
+
+  return {
+    rawData,
+    manuallyConfirmed: date.manual_confirmed === true,
+    sourceExplicitYear: date.source_explicit_year === true,
+  }
+}
+
+function sanitizeCandidateForReview(candidate: EventDiscoveryCandidate) {
+  if (candidate.source_type !== 'sympla' || !candidate.event_date) return candidate
+
+  const metadata = candidateDateMetadata(candidate)
+  const trustedDate =
+    metadata.manuallyConfirmed ||
+    metadata.sourceExplicitYear ||
+    hasExplicitYearInCandidateSource(candidate)
+
+  if (trustedDate) return candidate
+
+  return {
+    ...candidate,
+    event_date: null,
+    confidence: Math.min(candidate.confidence, 55),
+  }
+}
+
 export async function getDiscoveryCandidatesAction() {
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
@@ -198,7 +239,7 @@ export async function getDiscoveryCandidatesAction() {
 
   return {
     success: true as const,
-    candidates: (data ?? []) as EventDiscoveryCandidate[],
+    candidates: ((data ?? []) as EventDiscoveryCandidate[]).map(sanitizeCandidateForReview),
   }
 }
 
@@ -313,7 +354,9 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
 
     return {
       success: true as const,
-      candidates: (candidates ?? []) as EventDiscoveryCandidate[],
+      candidates: ((candidates ?? []) as EventDiscoveryCandidate[]).map(
+        sanitizeCandidateForReview
+      ),
       found: normalized.length,
       searched: uniqueResults.length,
     }
@@ -630,7 +673,7 @@ export async function importSymplaEventAction(input: ImportSymplaEventInput) {
 
     return {
       success: true as const,
-      candidate,
+      candidate: sanitizeCandidateForReview(candidate),
     }
   } catch (error) {
     console.error('Erro ao importar URL da Sympla:', error)
@@ -651,6 +694,43 @@ export async function updateDiscoveryCandidateAction(
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
 
+  const { data: existingCandidate, error: existingError } = await auth.supabase
+    .from('event_candidates')
+    .select('source_type, raw_data')
+    .eq('id', candidateId)
+    .eq('status', 'pending')
+    .single()
+
+  if (existingError || !existingCandidate) {
+    return {
+      success: false as const,
+      error: databaseSetupMessage(existingError) || 'Evento encontrado não está mais disponível.',
+    }
+  }
+
+  const existingRawData =
+    existingCandidate.raw_data && typeof existingCandidate.raw_data === 'object'
+      ? existingCandidate.raw_data
+      : {}
+  const existingDateMeta =
+    'date' in existingRawData &&
+    existingRawData.date &&
+    typeof existingRawData.date === 'object'
+      ? (existingRawData.date as Record<string, unknown>)
+      : {}
+
+  const rawData =
+    existingCandidate.source_type === 'sympla' && updates.event_date !== undefined
+      ? {
+          ...existingRawData,
+          date: {
+            ...existingDateMeta,
+            manual_confirmed: Boolean(updates.event_date),
+            manual_confirmed_at: updates.event_date ? new Date().toISOString() : null,
+          },
+        }
+      : undefined
+
   const allowedUpdates = {
     title: updates.title !== undefined ? cleanText(updates.title, 180) : undefined,
     description: updates.description !== undefined ? cleanText(updates.description, 1600) || null : undefined,
@@ -669,6 +749,7 @@ export async function updateDiscoveryCandidateAction(
       updates.whatsapp_info !== undefined
         ? updates.whatsapp_info.replace(/\D/g, '').slice(0, 13) || null
         : undefined,
+    raw_data: rawData,
     updated_at: new Date().toISOString(),
   }
 
@@ -715,10 +796,28 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
     }
   }
 
+  const reviewCandidate = sanitizeCandidateForReview(candidate as EventDiscoveryCandidate)
+
+  if (candidate.source_type === 'sympla' && candidate.event_date && !reviewCandidate.event_date) {
+    return {
+      success: false as const,
+      error:
+        'A data encontrada na Sympla não possui ano confirmado. Abra a fonte e informe manualmente a data correta antes de aprovar.',
+    }
+  }
+
   if (!candidate.title || !candidate.city || !candidate.event_date) {
     return {
       success: false as const,
       error: 'Preencha título, cidade e data do evento antes de aprovar.',
+    }
+  }
+
+  const eventTime = new Date(candidate.event_date).getTime()
+  if (Number.isNaN(eventTime) || eventTime < Date.now() - 6 * 60 * 60 * 1000) {
+    return {
+      success: false as const,
+      error: 'A data do evento é inválida ou já passou. Revise a fonte antes de publicar.',
     }
   }
 
