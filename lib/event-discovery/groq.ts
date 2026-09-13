@@ -1,4 +1,4 @@
-import { groqBrowserResearch, groqStructuredJson } from '@/lib/groq/client'
+import { GROQ_DISCOVERY_MODEL, groqBrowserResearch, groqCompoundJson, groqStructuredJson } from '@/lib/groq/client'
 import type { DiscoverySource } from '@/types/event-discovery'
 
 export interface GroqDiscoveryInput {
@@ -519,4 +519,273 @@ Nunca deduza ano/data a partir da janela solicitada.`,
     candidate: candidates[0] ?? null,
     research,
   }
+}
+
+
+export interface GroqConsolidatedDiscoveryInput {
+  city: string
+  state?: string
+  periodDays: number
+  sources: DiscoverySource[]
+}
+
+interface GroqCompoundUrlInput {
+  city: string
+  state?: string
+  periodDays: number
+  source: 'facebook' | 'sympla' | 'roleagora'
+  url: string
+}
+
+function compoundSourceFromUrl(value: string): DiscoverySource {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+
+    if (host === 'sympla.com.br' || host.endsWith('.sympla.com.br')) return 'sympla'
+    if (host === 'roleagora.com.br' || host.endsWith('.roleagora.com.br')) return 'roleagora'
+
+    if (
+      host === 'facebook.com' ||
+      host.endsWith('.facebook.com') ||
+      host === 'fb.com' ||
+      host.endsWith('.fb.com')
+    ) {
+      return 'facebook'
+    }
+
+    if (host === 'reddit.com' || host.endsWith('.reddit.com')) return 'reddit'
+    return 'web'
+  } catch {
+    return 'web'
+  }
+}
+
+function compoundNormalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function compoundCityMatches(actual: string, expected: string) {
+  const actualCity = compoundNormalizeText(actual)
+  const expectedCity = compoundNormalizeText(expected)
+
+  return (
+    actualCity === expectedCity ||
+    actualCity.startsWith(expectedCity + ' ') ||
+    expectedCity.startsWith(actualCity + ' ')
+  )
+}
+
+function normalizeCompoundEvent(value: unknown): StructuredEvent | null {
+  if (!value || typeof value !== 'object') return null
+
+  const event = value as Record<string, unknown>
+  const stringValue = (key: string) =>
+    typeof event[key] === 'string' ? (event[key] as string) : ''
+
+  return {
+    is_single_event: event.is_single_event === true,
+    rejection_reason: stringValue('rejection_reason'),
+    title: stringValue('title'),
+    description: stringValue('description'),
+    event_date: stringValue('event_date'),
+    location_name: stringValue('location_name'),
+    address: stringValue('address'),
+    city: stringValue('city'),
+    state: stringValue('state'),
+    category_name: stringValue('category_name'),
+    image_url: stringValue('image_url'),
+    ticket_price: stringValue('ticket_price'),
+    whatsapp_info: stringValue('whatsapp_info'),
+    source_url: stringValue('source_url'),
+    source_title: stringValue('source_title'),
+    source_snippet: stringValue('source_snippet'),
+    date_evidence: stringValue('date_evidence'),
+    confidence:
+      typeof event.confidence === 'number' && Number.isFinite(event.confidence)
+        ? event.confidence
+        : 50,
+  }
+}
+
+function compoundEvents(value: unknown) {
+  if (!value || typeof value !== 'object') return [] as StructuredEvent[]
+
+  const events = (value as Record<string, unknown>).events
+  if (!Array.isArray(events)) return [] as StructuredEvent[]
+
+  return events
+    .slice(0, 18)
+    .map(normalizeCompoundEvent)
+    .filter((event): event is StructuredEvent => Boolean(event))
+}
+
+function compoundSourceRules(sources: DiscoverySource[]) {
+  return sources
+    .map((source) => '- ' + source + ': ' + sourceInstructions(source))
+    .join('\n')
+}
+
+function compoundJsonShape() {
+  return [
+    'Retorne SOMENTE JSON válido no formato:',
+    '{"events":[{"is_single_event":true,"rejection_reason":"","title":"","description":"","event_date":"YYYY-MM-DDTHH:mm:ss-03:00","location_name":"","address":"","city":"","state":"","category_name":"","image_url":"","ticket_price":"","whatsapp_info":"","source_url":"https://...","source_title":"","source_snippet":"","date_evidence":"trecho com ano e horário","confidence":0}]}',
+    'Campos desconhecidos devem ser string vazia. Não escreva texto fora do JSON.',
+  ].join('\n')
+}
+
+function compoundCandidate(
+  event: StructuredEvent,
+  allowedSources: DiscoverySource[],
+  city: string,
+  state: string | undefined,
+  start: string,
+  end: string
+) {
+  const source = compoundSourceFromUrl(event.source_url)
+
+  if (!allowedSources.includes(source)) return null
+  if (!compoundCityMatches(event.city, city)) return null
+
+  const eventState = event.state.trim().toUpperCase()
+  if (state && eventState && eventState !== state.toUpperCase()) return null
+
+  const candidate = toCandidate(event, source, start, end, '')
+  if (!candidate) return null
+
+  return {
+    ...candidate,
+    raw_data: {
+      discovery_engine: 'groq-compound',
+      groq_model: GROQ_DISCOVERY_MODEL,
+      validation: {
+        is_single_event: true,
+        date_evidence: event.date_evidence,
+        window_start: start,
+        window_end: end,
+        source_type_inferred: source,
+      },
+    },
+  } satisfies GroqEventCandidate
+}
+
+export async function discoverEventsWithGroq(input: GroqConsolidatedDiscoveryInput) {
+  const window = getDiscoveryWindow(input.periodDays)
+  const sources = Array.from(new Set(input.sources))
+
+  const prompt = [
+    'Você é o motor de descoberta do Aonde Tem Baile.',
+    '',
+    'Faça UMA pesquisa web ampla e atual para encontrar no máximo 16 eventos presenciais futuros em ' +
+      input.city +
+      (input.state ? ' - ' + input.state : '') +
+      '.',
+    'Janela obrigatória: ' + window.start + ' até ' + window.end + ', inclusive.',
+    'Fontes habilitadas: ' + sources.join(', ') + '.',
+    '',
+    'Regras por fonte:',
+    compoundSourceRules(sources),
+    '',
+    'Tipos desejados: bailes, festas, shows, forró, sertanejo, pagode, samba, rock, música eletrônica, festivais e eventos com dança.',
+    '',
+    'REGRAS OBRIGATÓRIAS:',
+    '1. Cada item deve representar UM único evento específico.',
+    '2. Exclua guias, agendas, calendários, páginas de cidade/categoria, matérias, listas e páginas com vários eventos.',
+    '3. Exclua eventos passados, encerrados ou fora da janela.',
+    '4. A fonte precisa comprovar explicitamente ANO e HORÁRIO. Nunca deduza o ano usando a janela.',
+    '5. source_url precisa ser uma URL real encontrada na pesquisa.',
+    '6. A cidade precisa corresponder à cidade solicitada.',
+    '7. Não retorne fontes que não estejam habilitadas.',
+    '8. Qualidade é mais importante que quantidade. Pode retornar zero eventos.',
+    '',
+    compoundJsonShape(),
+  ].join('\n')
+
+  const response = await groqCompoundJson<StructuredEventsResponse>(prompt, {
+    enabledTools: ['web_search'],
+    maxCompletionTokens: 4500,
+  })
+
+  const rawEvents = compoundEvents(response)
+  const seen = new Set<string>()
+  const events: GroqEventCandidate[] = []
+
+  for (const event of rawEvents) {
+    const candidate = compoundCandidate(
+      event,
+      sources,
+      input.city,
+      input.state,
+      window.start,
+      window.end
+    )
+
+    if (!candidate || seen.has(candidate.source_url)) continue
+    seen.add(candidate.source_url)
+    events.push(candidate)
+  }
+
+  return {
+    events,
+    searched: rawEvents.length,
+  }
+}
+
+export async function inspectEventUrlWithGroqCompound(input: GroqCompoundUrlInput) {
+  const window = getDiscoveryWindow(input.periodDays)
+
+  if (!sourceMatches(input.source, input.url)) {
+    throw new Error('A URL não corresponde à fonte selecionada ou ao formato esperado.')
+  }
+
+  const directContext = (await fetchExactPublicContext(input.url)).slice(0, 6500)
+
+  const prompt = [
+    'Você está validando uma URL pública informada manualmente para o Aonde Tem Baile.',
+    '',
+    'URL exata: ' + input.url,
+    'Fonte: ' + input.source,
+    'Cidade esperada: ' + input.city + (input.state ? ' - ' + input.state : ''),
+    'Janela obrigatória: ' + window.start + ' até ' + window.end + '.',
+    '',
+    'Contexto obtido por acesso HTTP público, sem login, cookies ou bypass:',
+    '--- INÍCIO ---',
+    directContext,
+    '--- FIM ---',
+    '',
+    'Use pesquisa web ou visita ao site para corroborar quando necessário.',
+    'Retorne o evento somente se a URL representar UM evento específico.',
+    'ANO e HORÁRIO precisam estar explicitamente comprovados. Nunca deduza o ano.',
+    'Sympla deve ser /evento/. Rolê Agora deve ser /event/. Facebook pode ser /events/, post ou /share/ público.',
+    'Se o conteúdo estiver bloqueado e não houver evidência pública suficiente, retorne events vazio.',
+    'Quando o evento for comprovado, use a URL fornecida acima em source_url.',
+    'Nunca invente título, data, local, imagem ou preço.',
+    '',
+    compoundJsonShape(),
+  ].join('\n')
+
+  const response = await groqCompoundJson<StructuredEventsResponse>(prompt, {
+    enabledTools: ['web_search', 'visit_website'],
+    maxCompletionTokens: 2200,
+  })
+
+  for (const event of compoundEvents(response)) {
+    const candidate = compoundCandidate(
+      { ...event, source_url: input.url },
+      [input.source],
+      input.city,
+      input.state,
+      window.start,
+      window.end
+    )
+
+    if (candidate) return { candidate }
+  }
+
+  return { candidate: null }
 }
