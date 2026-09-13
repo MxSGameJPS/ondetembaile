@@ -40,9 +40,11 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
     minute: '2-digit',
   })
 
-  // Format WhatsApp number link
-  const cleanWhatsapp = event.whatsapp_info.replace(/\D/g, '')
-  const whatsappUrl = `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Vi o evento "${event.title}" no Aonde Tem Baile e gostaria de mais informações.`)}`
+  // Format WhatsApp number link when a contact number is available.
+  const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
+  const whatsappUrl = cleanWhatsapp
+    ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Vi o evento "${event.title}" no Aonde Tem Baile e gostaria de mais informações.`)}`
+    : null
 
   return (
     <div className={styles.card}>
