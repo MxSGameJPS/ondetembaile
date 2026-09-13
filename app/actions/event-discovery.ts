@@ -315,11 +315,15 @@ export async function importFacebookEventAction(input: ImportFacebookEventInput)
           facebookResultScore(a, normalizedUrl, lookupTerm)
       )
 
-    if (facebookResults.length === 0) {
+    const bestScore = facebookResults[0]
+      ? facebookResultScore(facebookResults[0], normalizedUrl, lookupTerm)
+      : 0
+
+    if (facebookResults.length === 0 || bestScore < 20) {
       return {
         success: false as const,
         error:
-          'O Brave ainda não encontrou esta URL do Facebook no índice público. Tente novamente mais tarde ou use a busca geral por cidade.',
+          'O Brave ainda não encontrou esta URL do Facebook com confiança suficiente no índice público. Tente novamente mais tarde ou use a busca geral por cidade.',
       }
     }
 
