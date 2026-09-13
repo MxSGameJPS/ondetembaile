@@ -134,12 +134,12 @@ function prepareCandidates(candidates: EventDiscoveryCandidate[]) {
 }
 
 async function upsertCandidates(
-  supabase: Awaited<ReturnType<typeof requireAdmin>> extends { supabase: infer T } ? T : never,
+  supabase: any,
   candidates: GroqEventCandidate[]
 ) {
   if (candidates.length === 0) return null
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('event_candidates')
     .upsert(candidates, {
       onConflict: 'source_url',
