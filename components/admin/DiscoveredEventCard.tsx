@@ -136,7 +136,9 @@ export default function DiscoveredEventCard({
                 ? 'Facebook'
                 : candidate.source_type === 'sympla'
                   ? 'Sympla'
-                  : 'Web'}
+                  : candidate.source_type === 'roleagora'
+                    ? 'Rolê Agora'
+                    : 'Web'}
           </span>
           <span className={styles.confidenceBadge}>
             {candidate.confidence}% · {confidenceLabel}

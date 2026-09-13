@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
 import DiscoveredEventCard from '@/components/admin/DiscoveredEventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2, Ticket } from 'lucide-react'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2, Ticket, Sparkles } from 'lucide-react'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
 import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
@@ -13,6 +13,7 @@ import {
   discoverEventsAction,
   getDiscoveryCandidatesAction,
   importFacebookEventAction,
+  importRoleAgoraEventAction,
   importSymplaEventAction,
   rejectDiscoveryCandidateAction,
   updateDiscoveryCandidateAction,
@@ -53,11 +54,13 @@ export default function AdminDashboardPage() {
   const [discoverCity, setDiscoverCity] = useState('')
   const [discoverState, setDiscoverState] = useState('RS')
   const [discoverPeriod, setDiscoverPeriod] = useState(30)
-  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit', 'facebook', 'sympla'])
+  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'facebook', 'sympla', 'roleagora'])
   const [facebookUrl, setFacebookUrl] = useState('')
   const [importingFacebook, setImportingFacebook] = useState(false)
   const [symplaUrl, setSymplaUrl] = useState('')
   const [importingSympla, setImportingSympla] = useState(false)
+  const [roleAgoraUrl, setRoleAgoraUrl] = useState('')
+  const [importingRoleAgora, setImportingRoleAgora] = useState(false)
   const [discovering, setDiscovering] = useState(false)
   const [candidateBusyId, setCandidateBusyId] = useState<string | null>(null)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
@@ -164,8 +167,11 @@ export default function AdminDashboardPage() {
 
     if (res.success) {
       setCandidateEvents(res.candidates)
+      const warningText = res.warnings?.length
+        ? ` Algumas fontes tiveram avisos: ${res.warnings.join(' | ')}`
+        : ''
       setDiscoverySummary(
-        `Brave analisou ${res.searched} resultado(s) e normalizou ${res.found} candidato(s). A fila abaixo mostra apenas itens ainda pendentes de revisão.`
+        `Groq pesquisou e validou ${res.searched} resultado(s), aceitando ${res.found} evento(s) dentro de ${res.window.start} a ${res.window.end}.${warningText}`
       )
     } else {
       setDiscoveryError(res.error)
@@ -207,7 +213,7 @@ export default function AdminDashboardPage() {
     })
     setFacebookUrl('')
     setDiscoverySummary(
-      'URL do Facebook localizada pelo Brave e adicionada à fila de revisão. Confira os dados antes de publicar.'
+      'URL do Facebook pesquisada e validada pela Groq. O evento foi adicionado à fila de revisão.'
     )
   }
 
@@ -246,7 +252,46 @@ export default function AdminDashboardPage() {
     })
     setSymplaUrl('')
     setDiscoverySummary(
-      'URL da Sympla localizada pelo Brave e adicionada à fila de revisão. Confira os dados antes de publicar.'
+      'URL da Sympla pesquisada e validada pela Groq. O evento foi adicionado à fila de revisão.'
+    )
+  }
+
+  const handleImportRoleAgoraUrl = async () => {
+    if (!roleAgoraUrl.trim()) {
+      setDiscoveryError('Cole uma URL de evento do Rolê Agora para importar.')
+      return
+    }
+
+    if (!discoverCity.trim()) {
+      setDiscoveryError('Informe a cidade antes de importar a URL do Rolê Agora.')
+      return
+    }
+
+    setImportingRoleAgora(true)
+    setDiscoveryError(null)
+    setDiscoverySummary(null)
+
+    const res = await importRoleAgoraEventAction({
+      url: roleAgoraUrl,
+      city: discoverCity,
+      state: discoverState,
+      periodDays: discoverPeriod,
+    })
+
+    setImportingRoleAgora(false)
+
+    if (!res.success) {
+      setDiscoveryError(res.error)
+      return
+    }
+
+    setCandidateEvents((current) => {
+      const withoutImported = current.filter((candidate) => candidate.id !== res.candidate.id)
+      return [res.candidate, ...withoutImported]
+    })
+    setRoleAgoraUrl('')
+    setDiscoverySummary(
+      'URL do Rolê Agora pesquisada e validada pela Groq. O evento foi adicionado à fila de revisão.'
     )
   }
 
@@ -519,12 +564,12 @@ export default function AdminDashboardPage() {
             <div className={styles.discoveryPanelHeader}>
               <div>
                 <div className={styles.discoveryEyebrow}>
-                  <Globe2 size={15} />
-                  <span>Descoberta via Brave Search</span>
+                  <Sparkles size={15} />
+                  <span>Descoberta com Groq + busca em tempo real</span>
                 </div>
                 <h2>Encontrar eventos em fontes públicas</h2>
                 <p>
-                  Busque Web, Reddit, Facebook e eventos indexados da Sympla. Revise os dados antes de publicar.
+                  A Groq pesquisa as fontes, rejeita páginas de guia/listagem e só aceita eventos com data e horário comprovados dentro da janela escolhida.
                 </p>
               </div>
 
@@ -568,7 +613,6 @@ export default function AdminDashboardPage() {
                   onChange={(event) => setDiscoverPeriod(Number(event.target.value))}
                   disabled={discovering}
                 >
-                  <option value={14}>Próximos 14 dias</option>
                   <option value={30}>Próximos 30 dias</option>
                   <option value={60}>Próximos 60 dias</option>
                   <option value={90}>Próximos 90 dias</option>
@@ -622,6 +666,17 @@ export default function AdminDashboardPage() {
                 <Ticket size={15} />
                 <span>Sympla</span>
               </label>
+
+              <label className={styles.sourceOption}>
+                <input
+                  type="checkbox"
+                  checked={discoverSources.includes('roleagora')}
+                  onChange={() => toggleDiscoverySource('roleagora')}
+                  disabled={discovering}
+                />
+                <Calendar size={15} />
+                <span>Rolê Agora</span>
+              </label>
             </div>
 
             <div className={styles.facebookImport}>
@@ -631,7 +686,7 @@ export default function AdminDashboardPage() {
                   <span>Importar URL do Facebook</span>
                 </div>
                 <p>
-                  Cole o link de um evento ou publicação pública. O sistema procura a URL no índice do Brave sem acessar o Facebook diretamente.
+                  Cole o link público. A Groq tenta localizar e validar o conteúdo em tempo real, inclusive links /share/, sem inventar dados quando a Meta bloquear o acesso.
                 </p>
               </div>
 
@@ -662,7 +717,7 @@ export default function AdminDashboardPage() {
                   <span>Importar URL da Sympla</span>
                 </div>
                 <p>
-                  Cole a URL pública de um evento da Sympla. O sistema procura a página pelo índice do Brave sem fazer crawler direto na plataforma.
+                  Cole a URL de um evento da Sympla. A Groq valida se ele é futuro e se está dentro do período selecionado.
                 </p>
               </div>
 
@@ -682,6 +737,37 @@ export default function AdminDashboardPage() {
                 >
                   <Search size={16} />
                   <span>{importingSympla ? 'Localizando...' : 'Importar URL'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.facebookImport}>
+              <div className={styles.facebookImportCopy}>
+                <div className={styles.facebookImportTitle}>
+                  <Calendar size={15} />
+                  <span>Importar URL do Rolê Agora</span>
+                </div>
+                <p>
+                  Aceita apenas páginas individuais /event/. Páginas /city/, guias e agendas são rejeitadas automaticamente.
+                </p>
+              </div>
+
+              <div className={styles.facebookImportForm}>
+                <input
+                  type="url"
+                  value={roleAgoraUrl}
+                  placeholder="https://www.roleagora.com.br/event/..."
+                  onChange={(event) => setRoleAgoraUrl(event.target.value)}
+                  disabled={importingRoleAgora || discovering}
+                />
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={handleImportRoleAgoraUrl}
+                  disabled={importingRoleAgora || discovering || !roleAgoraUrl.trim()}
+                >
+                  <Search size={16} />
+                  <span>{importingRoleAgora ? 'Localizando...' : 'Importar URL'}</span>
                 </button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-export type DiscoverySource = 'web' | 'reddit' | 'facebook' | 'sympla'
+export type DiscoverySource = 'web' | 'reddit' | 'facebook' | 'sympla' | 'roleagora'
 
 export type DiscoveryCandidateStatus = 'pending' | 'approved' | 'rejected'
 
@@ -17,6 +17,13 @@ export interface ImportFacebookEventInput {
 }
 
 export interface ImportSymplaEventInput {
+  url: string
+  city: string
+  state?: string
+  periodDays: number
+}
+
+export interface ImportRoleAgoraEventInput {
   url: string
   city: string
   state?: string
