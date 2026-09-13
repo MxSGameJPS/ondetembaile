@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import EventMap from '@/components/EventMap'
 import SocialShare from '@/components/SocialShare'
-import { Calendar, MapPin, Ticket, MessageCircle, ArrowLeft, Globe, Share2 } from 'lucide-react'
+import { Calendar, MapPin, Ticket, MessageCircle, ArrowLeft, Globe, Share2, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import styles from './page.module.css'
@@ -138,17 +138,30 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               <div className={styles.ticketValue}>{event.ticket_price}</div>
             </div>
 
-            {/* WhatsApp Contact Action */}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-success"
-              style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
-            >
-              <MessageCircle size={20} />
-              <span>WhatsApp para Informações</span>
-            </a>
+            {/* Contact / original source action */}
+            {whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-success"
+                style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
+              >
+                <MessageCircle size={20} />
+                <span>WhatsApp para Informações</span>
+              </a>
+            ) : event.source_url ? (
+              <a
+                href={event.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary"
+                style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
+              >
+                <ExternalLink size={20} />
+                <span>Ver fonte original do evento</span>
+              </a>
+            ) : null}
 
             {/* Event Networks / Producer Info */}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
@@ -157,6 +170,18 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               </div>
 
               <div className={styles.socialLinks}>
+                {event.source_url && (
+                  <a
+                    href={event.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.socialBtn}
+                  >
+                    <ExternalLink size={16} color="#f97316" />
+                    <span>Fonte original</span>
+                  </a>
+                )}
+
                 {event.facebook_url && (
                   <a
                     href={event.facebook_url}
@@ -181,7 +206,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   </a>
                 )}
 
-                {!event.facebook_url && !event.instagram_handle && (
+                {!event.facebook_url && !event.instagram_handle && !event.source_url && (
                   <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>
                     Nenhuma rede social informada para este evento.
                   </p>
