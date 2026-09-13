@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCategoriesAction } from '@/app/actions/categories'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { Search, MapPin, Sparkles, PlusCircle, Tag } from 'lucide-react'
+import { Search, MapPin, Sparkles, PlusCircle, Tag, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import styles from './page.module.css'
 
@@ -106,7 +106,10 @@ export default function HomePage() {
     const matchesCity = searchCity.trim() === '' || e.city.toLowerCase().includes(searchCity.toLowerCase().trim())
     if (!matchesCity) return false
 
-    const matchesCategory = selectedCategory === 'all' || e.category_id === selectedCategory || e.category_name === selectedCategory
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      e.category_id === selectedCategory ||
+      (e.category_name && e.category_name.toLowerCase() === selectedCategory.toLowerCase())
 
     if (!matchesCategory) return false
 
@@ -118,6 +121,14 @@ export default function HomePage() {
 
     return true
   })
+
+  const clearFilters = () => {
+    setSearchCity('')
+    setSelectedCategory('all')
+    setFilterPeriod('all')
+  }
+
+  const activeCategoryName = categories.find((c) => c.id === selectedCategory)?.name || selectedCategory
 
   return (
     <div>
@@ -136,19 +147,39 @@ export default function HomePage() {
             Festas, shows, bailes e eventos da sua região.
           </p>
 
-          {/* Search Box by City */}
-          <div className={styles.searchContainer}>
+          {/* Dual Search Box: Cidade + Categoria */}
+          <div className={styles.searchBoxGrid}>
+            {/* Input 1: Cidade */}
             <div className={styles.searchInputWrapper}>
-              <MapPin size={20} color="#F26A00" />
+              <MapPin size={18} color="#F26A00" />
               <input
                 type="text"
-                placeholder="Digite o nome da sua cidade (ex: Porto Alegre, Pelotas, Caxias)..."
+                placeholder="Buscar por Cidade (ex: Porto Alegre)..."
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
                 className={styles.searchInput}
               />
             </div>
-            <button className="btn-primary" style={{ padding: '0.8rem 1.4rem', borderRadius: '16px' }}>
+
+            {/* Input 2: Categoria Dropdown */}
+            <div className={styles.searchInputWrapper}>
+              <Tag size={18} color="#F26A00" />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className={styles.searchSelect}
+              >
+                <option value="all">Todas as Categorias</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search Button */}
+            <button className="btn-primary" style={{ padding: '0.75rem 1.4rem', borderRadius: '12px' }}>
               <Search size={18} />
               <span>Encontrar eventos</span>
             </button>
@@ -164,17 +195,48 @@ export default function HomePage() {
           <div className={styles.sectionHeader}>
             <div>
               <h2 className={styles.sectionTitle}>
-                {searchCity.trim() ? `Eventos em "${searchCity}"` : 'Próximos Eventos'}
+                {searchCity.trim() && selectedCategory !== 'all'
+                  ? `Eventos de ${activeCategoryName} em "${searchCity}"`
+                  : searchCity.trim()
+                  ? `Eventos em "${searchCity}"`
+                  : selectedCategory !== 'all'
+                  ? `Eventos de ${activeCategoryName}`
+                  : 'Próximos Eventos'}
               </h2>
               <p style={{ color: '#9ca3af', fontSize: '0.85rem', marginTop: '4px' }}>
                 Exibindo {filteredEvents.length} baile(s) cadastrado(s)
               </p>
             </div>
+
+            <div className={styles.filters}>
+              <button
+                className={`${styles.filterBtn} ${filterPeriod === 'all' ? styles.filterBtnActive : ''}`}
+                onClick={() => setFilterPeriod('all')}
+              >
+                Todos os Dias
+              </button>
+              <button
+                className={`${styles.filterBtn} ${filterPeriod === 'weekend' ? styles.filterBtnActive : ''}`}
+                onClick={() => setFilterPeriod('weekend')}
+              >
+                Este Fim de Semana
+              </button>
+              {(searchCity || selectedCategory !== 'all' || filterPeriod !== 'all') && (
+                <button
+                  onClick={clearFilters}
+                  className={styles.filterBtn}
+                  style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
+                >
+                  <RotateCcw size={13} />
+                  <span>Limpar Filtros</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Category Filter Pills Bar */}
           {categories.length > 0 && (
-            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1.5rem', scrollbarWidth: 'none' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1.75rem', scrollbarWidth: 'none' }}>
               <button
                 className={`${styles.filterBtn} ${selectedCategory === 'all' ? styles.filterBtnActive : ''}`}
                 onClick={() => setSelectedCategory('all')}
@@ -209,15 +271,20 @@ export default function HomePage() {
           ) : (
             <div className={styles.emptyState}>
               <p style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#f8fafc', marginBottom: '0.5rem' }}>
-                Nenhum evento encontrado em "{searchCity}"
+                Nenhum evento encontrado {searchCity ? `em "${searchCity}"` : ''} {selectedCategory !== 'all' ? `na categoria "${activeCategoryName}"` : ''}
               </p>
               <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Conhece ou vai produzir um baile nessa cidade? Cadastre gratuitamente agora mesmo!
+                Conhece ou vai produzir um baile para essa categoria ou cidade? Cadastre gratuitamente agora mesmo!
               </p>
-              <Link href="/cadastro" className="btn-primary">
-                <PlusCircle size={18} />
-                Cadastrar Evento na Cidade
-              </Link>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button onClick={clearFilters} className="btn-secondary">
+                  Limpar Filtros
+                </button>
+                <Link href="/cadastro" className="btn-primary">
+                  <PlusCircle size={18} />
+                  Cadastrar Evento
+                </Link>
+              </div>
             </div>
           )}
         </div>
