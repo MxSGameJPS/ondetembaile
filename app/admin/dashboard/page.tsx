@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
 import DiscoveredEventCard from '@/components/admin/DiscoveredEventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2 } from 'lucide-react'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2, Ticket } from 'lucide-react'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
 import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
@@ -13,6 +13,7 @@ import {
   discoverEventsAction,
   getDiscoveryCandidatesAction,
   importFacebookEventAction,
+  importSymplaEventAction,
   rejectDiscoveryCandidateAction,
   updateDiscoveryCandidateAction,
 } from '@/app/actions/event-discovery'
@@ -52,9 +53,11 @@ export default function AdminDashboardPage() {
   const [discoverCity, setDiscoverCity] = useState('')
   const [discoverState, setDiscoverState] = useState('RS')
   const [discoverPeriod, setDiscoverPeriod] = useState(30)
-  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit', 'facebook'])
+  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit', 'facebook', 'sympla'])
   const [facebookUrl, setFacebookUrl] = useState('')
   const [importingFacebook, setImportingFacebook] = useState(false)
+  const [symplaUrl, setSymplaUrl] = useState('')
+  const [importingSympla, setImportingSympla] = useState(false)
   const [discovering, setDiscovering] = useState(false)
   const [candidateBusyId, setCandidateBusyId] = useState<string | null>(null)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
@@ -205,6 +208,45 @@ export default function AdminDashboardPage() {
     setFacebookUrl('')
     setDiscoverySummary(
       'URL do Facebook localizada pelo Brave e adicionada à fila de revisão. Confira os dados antes de publicar.'
+    )
+  }
+
+  const handleImportSymplaUrl = async () => {
+    if (!symplaUrl.trim()) {
+      setDiscoveryError('Cole uma URL de evento da Sympla para importar.')
+      return
+    }
+
+    if (!discoverCity.trim()) {
+      setDiscoveryError('Informe a cidade antes de importar a URL da Sympla.')
+      return
+    }
+
+    setImportingSympla(true)
+    setDiscoveryError(null)
+    setDiscoverySummary(null)
+
+    const res = await importSymplaEventAction({
+      url: symplaUrl,
+      city: discoverCity,
+      state: discoverState,
+      periodDays: discoverPeriod,
+    })
+
+    setImportingSympla(false)
+
+    if (!res.success) {
+      setDiscoveryError(res.error)
+      return
+    }
+
+    setCandidateEvents((current) => {
+      const withoutImported = current.filter((candidate) => candidate.id !== res.candidate.id)
+      return [res.candidate, ...withoutImported]
+    })
+    setSymplaUrl('')
+    setDiscoverySummary(
+      'URL da Sympla localizada pelo Brave e adicionada à fila de revisão. Confira os dados antes de publicar.'
     )
   }
 
@@ -482,7 +524,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <h2>Encontrar eventos em fontes públicas</h2>
                 <p>
-                  Busque Web, Reddit e páginas públicas indexadas do Facebook. Revise os dados antes de publicar.
+                  Busque Web, Reddit, Facebook e eventos indexados da Sympla. Revise os dados antes de publicar.
                 </p>
               </div>
 
@@ -569,6 +611,17 @@ export default function AdminDashboardPage() {
                 <Share2 size={15} />
                 <span>Facebook</span>
               </label>
+
+              <label className={styles.sourceOption}>
+                <input
+                  type="checkbox"
+                  checked={discoverSources.includes('sympla')}
+                  onChange={() => toggleDiscoverySource('sympla')}
+                  disabled={discovering}
+                />
+                <Ticket size={15} />
+                <span>Sympla</span>
+              </label>
             </div>
 
             <div className={styles.facebookImport}>
@@ -598,6 +651,37 @@ export default function AdminDashboardPage() {
                 >
                   <Search size={16} />
                   <span>{importingFacebook ? 'Localizando...' : 'Importar URL'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.facebookImport}>
+              <div className={styles.facebookImportCopy}>
+                <div className={styles.facebookImportTitle}>
+                  <Ticket size={15} />
+                  <span>Importar URL da Sympla</span>
+                </div>
+                <p>
+                  Cole a URL pública de um evento da Sympla. O sistema procura a página pelo índice do Brave sem fazer crawler direto na plataforma.
+                </p>
+              </div>
+
+              <div className={styles.facebookImportForm}>
+                <input
+                  type="url"
+                  value={symplaUrl}
+                  placeholder="https://www.sympla.com.br/evento/..."
+                  onChange={(event) => setSymplaUrl(event.target.value)}
+                  disabled={importingSympla || discovering}
+                />
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={handleImportSymplaUrl}
+                  disabled={importingSympla || discovering || !symplaUrl.trim()}
+                >
+                  <Search size={16} />
+                  <span>{importingSympla ? 'Localizando...' : 'Importar URL'}</span>
                 </button>
               </div>
             </div>
