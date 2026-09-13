@@ -40,6 +40,7 @@ export interface DiscoveryContext {
   state?: string
   periodDays: number
   sourceType: DiscoverySource
+  forceEvent?: boolean
 }
 
 export interface NormalizedDiscoveredEvent {
@@ -445,6 +446,7 @@ export async function normalizeBraveResult(
   )
 
   const looksLikeEvent =
+    context.forceEvent ||
     facebookEvent ||
     EVENT_KEYWORDS.some((keyword) => braveText.toLowerCase().includes(keyword))
   if (!looksLikeEvent) return null
