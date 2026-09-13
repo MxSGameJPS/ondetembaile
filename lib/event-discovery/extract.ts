@@ -116,6 +116,17 @@ function getDomain(value: string) {
   }
 }
 
+function resolvePublicAssetUrl(value: string | null, baseUrl: string) {
+  if (!value) return null
+
+  try {
+    const url = new URL(value, baseUrl)
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
 function isPrivateIpv4(ip: string) {
   const octets = ip.split('.').map(Number)
   if (octets.length !== 4 || octets.some((part) => Number.isNaN(part))) return false
@@ -445,13 +456,15 @@ export async function normalizeBraveResult(
       ? structuredDateCandidate
       : null
 
-  const eventDate = structuredDate ?? parseDateFromText(braveText, context.periodDays)
-  const image =
+  const dateText = `${braveText} ${rawTitle} ${rawDescription}`
+  const eventDate = structuredDate ?? parseDateFromText(dateText, context.periodDays)
+  const rawImage =
     jsonLdImage(jsonLdEvent?.image) ||
     pageImage ||
     result.thumbnail?.original ||
     result.thumbnail?.src ||
     null
+  const image = resolvePublicAssetUrl(rawImage, sourceUrl)
 
   const combinedText = `${rawTitle} ${rawDescription} ${location.address ?? ''}`
   const price = jsonLdPrice(jsonLdEvent?.offers) ?? extractPrice(combinedText)
