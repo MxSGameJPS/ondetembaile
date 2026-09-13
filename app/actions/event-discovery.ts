@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/admin'
 import {
-  discoverSourceWithGroq,
+  discoverEventsWithGroq,
   getDiscoveryWindow,
-  inspectEventUrlWithGroq,
+  inspectEventUrlWithGroqCompound,
   type GroqEventCandidate,
 } from '@/lib/event-discovery/groq'
 import type {
@@ -202,31 +202,28 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return { success: false as const, error: 'Selecione ao menos uma fonte de busca.' }
   }
 
-  const discovered: GroqEventCandidate[] = []
-  const warnings: string[] = []
-  let searched = 0
+  let discoveryResult: Awaited<ReturnType<typeof discoverEventsWithGroq>>
 
-  for (const source of sources) {
-    try {
-      const result = await discoverSourceWithGroq({
-        city,
-        state: state || undefined,
-        periodDays,
-        source,
-      })
-
-      discovered.push(...result.events)
-      searched += result.searched
-    } catch (error) {
-      console.error(`Erro na descoberta Groq para ${source}:`, error)
-      warnings.push(
-        `${source}: ${error instanceof Error ? error.message : 'falha inesperada'}`
-      )
+  try {
+    discoveryResult = await discoverEventsWithGroq({
+      city,
+      state: state || undefined,
+      periodDays,
+      sources,
+    })
+  } catch (error) {
+    console.error('Erro na descoberta consolidada com Groq:', error)
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível concluir a busca de eventos com a Groq.',
     }
   }
 
   const unique = new Map<string, GroqEventCandidate>()
-  for (const candidate of discovered) {
+  for (const candidate of discoveryResult.events) {
     unique.set(normalizeSourceUrl(candidate.source_url), candidate)
   }
   const candidatesToSave = Array.from(unique.values())
@@ -260,19 +257,12 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return { success: false as const, error: databaseSetupMessage(candidatesError) }
   }
 
-  if (candidatesToSave.length === 0 && warnings.length === sources.length) {
-    return {
-      success: false as const,
-      error: `Nenhuma fonte conseguiu concluir a busca com Groq. ${warnings.join(' | ')}`,
-    }
-  }
-
   return {
     success: true as const,
     candidates: prepareCandidates((candidates ?? []) as EventDiscoveryCandidate[]),
     found: candidatesToSave.length,
-    searched,
-    warnings,
+    searched: discoveryResult.searched,
+    warnings: [] as string[],
     window,
   }
 }
@@ -308,7 +298,7 @@ async function importUrlWithGroq(
   }
 
   try {
-    const result = await inspectEventUrlWithGroq({
+    const result = await inspectEventUrlWithGroqCompound({
       url,
       city,
       state: state || undefined,
