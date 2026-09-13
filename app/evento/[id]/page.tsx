@@ -61,8 +61,10 @@ export default async function EventDetailPage({ params }: EventPageProps) {
     minute: '2-digit',
   })
 
-  const cleanWhatsapp = event.whatsapp_info.replace(/\D/g, '')
-  const whatsappUrl = `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Quero mais informações sobre o evento "${event.title}" no Aonde Tem Baile.`)}`
+  const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
+  const whatsappUrl = cleanWhatsapp
+    ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Quero mais informações sobre o evento "${event.title}" no Aonde Tem Baile.`)}`
+    : null
   const currentUrl = `https://aondetembaile.com.br/evento/${event.id}`
 
   return (
