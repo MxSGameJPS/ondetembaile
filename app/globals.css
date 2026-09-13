@@ -1,22 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap');
+
 :root {
-  --bg-primary: #090d16;
-  --bg-secondary: #111827;
-  --bg-card: #1f2937;
-  --bg-card-hover: #374151;
-  --border-color: rgba(245, 158, 11, 0.2);
-  --border-color-hover: rgba(245, 158, 11, 0.5);
+  /* Brand Book Official Color Palette */
+  --color-orange: #F26A00;
+  --color-orange-hover: #e06000;
+  --color-black: #111111;
+  --color-dark-gray: #2E2E2E;
+  --color-medium-gray: #757575;
+  --color-light-gray: #D9D9D9;
+  --color-white: #FFFFFF;
   
-  --accent-gold: #f59e0b;
-  --accent-orange: #f97316;
-  --accent-yellow: #fde047;
+  --bg-primary: #111111;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #242424;
+  --bg-card-hover: #2e2e2e;
+  --border-color: rgba(242, 106, 0, 0.25);
+  --border-color-hover: rgba(242, 106, 0, 0.6);
+  
+  --accent-gold: #F26A00;
+  --accent-orange: #F26A00;
   --accent-emerald: #10b981;
   --accent-red: #ef4444;
   
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-primary: #FFFFFF;
+  --text-secondary: #D9D9D9;
+  --text-muted: #757575;
 
-  --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -53,12 +63,12 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: var(--color-dark-gray);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-gold);
+  background: var(--color-orange);
 }
 
 /* Global Container Utility */
@@ -70,9 +80,7 @@ a {
 
 /* Typography Utilities */
 .gradient-text {
-  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-orange) 50%, var(--accent-yellow) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-orange);
 }
 
 /* Button Utilities */
@@ -81,21 +89,22 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-orange) 100%);
-  color: #030712;
+  background: var(--color-orange);
+  color: #ffffff;
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  padding: 0.8rem 1.6rem;
   border-radius: var(--radius-lg);
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 4px 14px rgba(242, 106, 0, 0.35);
 }
 
 .btn-primary:hover {
+  background: var(--color-orange-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 6px 20px rgba(242, 106, 0, 0.5);
 }
 
 .btn-secondary {
@@ -103,21 +112,21 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   font-weight: 600;
   font-size: 0.9rem;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-color-hover);
-  color: var(--accent-gold);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-orange);
+  color: var(--color-orange);
 }
 
 .btn-outline {
@@ -126,7 +135,7 @@ a {
   justify-content: center;
   gap: 0.5rem;
   background: transparent;
-  color: var(--accent-gold);
+  color: var(--color-orange);
   font-weight: 600;
   font-size: 0.85rem;
   padding: 0.5rem 1rem;
@@ -137,8 +146,8 @@ a {
 }
 
 .btn-outline:hover {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: var(--accent-gold);
+  background: rgba(242, 106, 0, 0.12);
+  border-color: var(--color-orange);
 }
 
 .btn-danger {
@@ -185,8 +194,7 @@ a {
 
 /* Card Utility */
 .glass-card {
-  background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(12px);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
@@ -204,15 +212,15 @@ a {
 .form-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #d1d5db;
+  color: var(--color-light-gray);
 }
 
 .form-input, .form-select, .form-textarea {
   width: 100%;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #181818;
+  border: 1px solid #333333;
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1rem;
   color: var(--text-primary);
   font-size: 0.95rem;
   font-family: inherit;
@@ -221,8 +229,8 @@ a {
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  border-color: var(--color-orange);
+  box-shadow: 0 0 0 3px rgba(242, 106, 0, 0.2);
 }
 
 .form-checkbox {
@@ -231,13 +239,13 @@ a {
   gap: 0.75rem;
   cursor: pointer;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--color-light-gray);
 }
 
 .form-checkbox input[type="checkbox"] {
   width: 1.1rem;
   height: 1.1rem;
-  accent-color: var(--accent-gold);
+  accent-color: var(--color-orange);
   cursor: pointer;
 }
 
@@ -246,7 +254,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.25rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -254,9 +262,9 @@ a {
 }
 
 .badge-gold {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--accent-gold);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(242, 106, 0, 0.15);
+  color: var(--color-orange);
+  border: 1px solid rgba(242, 106, 0, 0.4);
 }
 
 .badge-green {

@@ -1,44 +1,63 @@
 .hero {
   position: relative;
-  padding: 4rem 1.5rem 3rem 1.5rem;
-  background: radial-gradient(circle at top center, rgba(245, 158, 11, 0.15) 0%, rgba(9, 13, 22, 1) 70%);
+  padding: 4.5rem 1.5rem 3.5rem 1.5rem;
+  background: radial-gradient(circle at top center, rgba(242, 106, 0, 0.18) 0%, rgba(17, 17, 17, 1) 75%);
   text-align: center;
-  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  border-bottom: 1px solid rgba(242, 106, 0, 0.2);
+}
+
+.sloganBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: rgba(242, 106, 0, 0.15);
+  border: 1px solid rgba(242, 106, 0, 0.4);
+  color: var(--color-orange);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.02em;
 }
 
 .heroTitle {
-  font-size: 2.75rem;
+  font-family: 'Inter', sans-serif;
+  font-style: italic;
   font-weight: 900;
-  line-height: 1.15;
-  margin-bottom: 1rem;
+  font-size: 3.25rem;
+  line-height: 1.1;
+  margin-bottom: 1.25rem;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
 }
 
 @media (max-width: 640px) {
   .heroTitle {
-    font-size: 2rem;
+    font-size: 2.15rem;
   }
 }
 
 .heroSubtitle {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  max-width: 600px;
+  font-size: 1.15rem;
+  color: var(--color-light-gray);
+  max-width: 620px;
   margin: 0 auto 2.5rem auto;
   line-height: 1.6;
+  font-weight: 400;
 }
 
 .searchContainer {
-  max-width: 650px;
+  max-width: 680px;
   margin: 0 auto;
-  background: rgba(17, 24, 39, 0.8);
-  backdrop-filter: blur(12px);
+  background: #1e1e1e;
   border: 1px solid var(--border-color);
   padding: 0.5rem;
   border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
 }
 
 .searchInputWrapper {
@@ -54,7 +73,7 @@
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-family: inherit;
   outline: none;
 }
@@ -79,9 +98,10 @@
 }
 
 .sectionTitle {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .filters {
@@ -93,26 +113,26 @@
 
 .filterBtn {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-secondary);
-  padding: 0.4rem 0.9rem;
+  padding: 0.45rem 1rem;
   border-radius: 9999px;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .filterBtnActive {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  background: rgba(242, 106, 0, 0.15);
+  border-color: var(--color-orange);
+  color: var(--color-orange);
 }
 
 .emptyState {
   background: var(--bg-secondary);
-  border: 1px border-dashed rgba(245, 158, 11, 0.3);
+  border: 1px dashed rgba(242, 106, 0, 0.4);
   border-radius: var(--radius-lg);
-  padding: 3rem 1.5rem;
+  padding: 3.5rem 1.5rem;
   text-align: center;
 }

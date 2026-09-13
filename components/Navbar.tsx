@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { Sparkles, PlusCircle, User as UserIcon, LogOut, ShieldCheck, Menu, X } from 'lucide-react'
+import { PlusCircle, User as UserIcon, LogOut, ShieldCheck, Menu, X } from 'lucide-react'
 import { signOutAction } from '@/app/actions/auth'
 import { useRouter } from 'next/navigation'
+import BrandLogo from '@/components/BrandLogo'
 import styles from './Navbar.module.css'
 
 export default function Navbar() {
@@ -63,17 +64,9 @@ export default function Navbar() {
     <header className={styles.header}>
       <div className={styles.container}>
         
-        {/* Logo */}
-        <Link href="/" className={styles.logo}>
-          <div className={styles.logoIcon}>
-            <div className={styles.logoInner}>
-              <Sparkles size={20} />
-            </div>
-          </div>
-          <div>
-            <div className={styles.logoTitle}>Aonde Tem Baile</div>
-            <div className={styles.logoSubtitle}>Eventos Regionais</div>
-          </div>
+        {/* Official Brand Logo */}
+        <Link href="/" className={styles.logoLink}>
+          <BrandLogo size="md" showSlogan={true} />
         </Link>
 
         {/* Desktop Nav Links */}

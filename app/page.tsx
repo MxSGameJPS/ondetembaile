@@ -124,22 +124,22 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className={styles.hero}>
         <div className="container">
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '9999px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+          <div className={styles.sloganBadge}>
             <Sparkles size={14} />
-            <span>O Maior Portal de Eventos Regionais</span>
+            <span>A Diversão começa aqui</span>
           </div>
 
           <h1 className={styles.heroTitle}>
-            Descubra <span className="gradient-text">Aonde Tem Baile</span> perto de você!
+            Descubra o que está <span className="gradient-text">rolando perto de você.</span>
           </h1>
           <p className={styles.heroSubtitle}>
-            Encontre bailes, festas, fandangos e shows em qualquer cidade do Brasil.
+            Festas, shows, bailes e eventos da sua região.
           </p>
 
           {/* Search Box by City */}
           <div className={styles.searchContainer}>
             <div className={styles.searchInputWrapper}>
-              <MapPin size={20} color="#f59e0b" />
+              <MapPin size={20} color="#F26A00" />
               <input
                 type="text"
                 placeholder="Digite o nome da sua cidade (ex: Porto Alegre, Pelotas, Caxias)..."
@@ -148,9 +148,9 @@ export default function HomePage() {
                 className={styles.searchInput}
               />
             </div>
-            <button className="btn-primary" style={{ padding: '0.75rem 1.25rem', borderRadius: '16px' }}>
+            <button className="btn-primary" style={{ padding: '0.8rem 1.4rem', borderRadius: '16px' }}>
               <Search size={18} />
-              <span>Buscar</span>
+              <span>Encontrar eventos</span>
             </button>
           </div>
         </div>
