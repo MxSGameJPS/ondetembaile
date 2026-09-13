@@ -39,7 +39,7 @@ create table if not exists public.event_candidates (
   whatsapp_info text,
   source_url text not null unique,
   source_domain text,
-  source_type text not null check (source_type in ('web', 'reddit', 'facebook')),
+  source_type text not null check (source_type in ('web', 'reddit', 'facebook', 'sympla')),
   source_title text,
   source_snippet text,
   confidence integer not null default 0 check (confidence between 0 and 100),
@@ -67,7 +67,7 @@ alter table public.event_candidates
 
 alter table public.event_candidates
   add constraint event_candidates_source_type_check
-  check (source_type in ('web', 'reddit', 'facebook'));
+  check (source_type in ('web', 'reddit', 'facebook', 'sympla'));
 
 alter table public.event_candidates enable row level security;
 

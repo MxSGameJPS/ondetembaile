@@ -13,6 +13,7 @@ import type {
   DiscoverySource,
   EventDiscoveryCandidate,
   ImportFacebookEventInput,
+  ImportSymplaEventInput,
   UpdateDiscoveryCandidateInput,
 } from '@/types/event-discovery'
 
@@ -48,6 +49,10 @@ function buildSearchQuery(source: DiscoverySource, city: string, state: string, 
 
   if (source === 'facebook') {
     return `site:facebook.com ${terms} ${location} ${period}`
+  }
+
+  if (source === 'sympla') {
+    return `site:sympla.com.br/evento ${terms} ${location} ${period}`
   }
 
   return `${terms} ${location} ${period}`
@@ -117,6 +122,64 @@ function facebookResultScore(result: BraveWebResult, normalizedUrl: string, look
   return score
 }
 
+function normalizeSymplaUrl(value: string) {
+  try {
+    const normalized = normalizeSourceUrl(value)
+    if (!normalized) return null
+
+    const url = new URL(normalized)
+    const hostname = url.hostname.toLowerCase()
+    const isSympla = hostname === 'sympla.com.br' || hostname.endsWith('.sympla.com.br')
+
+    if (!isSympla || !/\/evento(?:\/|$)/i.test(url.pathname)) return null
+
+    return normalized
+  } catch {
+    return null
+  }
+}
+
+function symplaLookupParts(value: string) {
+  try {
+    const url = new URL(value)
+    const segments = url.pathname.split('/').filter(Boolean)
+    const numericId = [...segments].reverse().find((segment) => /^\d{4,}$/.test(segment)) || ''
+    const slug =
+      [...segments].reverse().find((segment) => segment !== numericId && segment.toLowerCase() !== 'evento') ||
+      ''
+
+    return {
+      numericId,
+      slugText: slug.replace(/[-_]+/g, ' ').trim(),
+    }
+  } catch {
+    return { numericId: '', slugText: '' }
+  }
+}
+
+function symplaResultScore(
+  result: BraveWebResult,
+  normalizedUrl: string,
+  numericId: string,
+  slugText: string
+) {
+  const resultUrl = normalizeSourceUrl(result.url || '')
+  let score = 0
+
+  if (resultUrl === normalizedUrl) score += 100
+  if (numericId && resultUrl.includes(numericId)) score += 70
+  if (/\/evento(?:\/|$)/i.test(resultUrl)) score += 20
+
+  const haystack = `${result.title || ''} ${result.description || ''}`.toLowerCase()
+  if (slugText) {
+    const words = slugText.toLowerCase().split(/\s+/).filter((word) => word.length >= 4)
+    const matches = words.filter((word) => haystack.includes(word)).length
+    score += Math.min(matches * 4, 20)
+  }
+
+  return score
+}
+
 export async function getDiscoveryCandidatesAction() {
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
@@ -155,7 +218,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   const periodDays = normalizePeriodDays(Number(input.periodDays))
   const sources = Array.from(new Set(input.sources)).filter(
     (source): source is DiscoverySource =>
-      source === 'web' || source === 'reddit' || source === 'facebook'
+      source === 'web' ||
+      source === 'reddit' ||
+      source === 'facebook' ||
+      source === 'sympla'
   )
 
   if (!city) {
@@ -172,7 +238,13 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         const query = buildSearchQuery(source, city, state, periodDays)
         const results = await searchBraveWeb(
           query,
-          source === 'reddit' ? 12 : source === 'facebook' ? 14 : 18
+          source === 'reddit'
+            ? 12
+            : source === 'facebook'
+              ? 14
+              : source === 'sympla'
+                ? 16
+                : 18
         )
         return results.map((result) => ({ result, source }))
       })
@@ -408,6 +480,166 @@ export async function importFacebookEventAction(input: ImportFacebookEventInput)
         error instanceof Error
           ? error.message
           : 'Erro inesperado ao localizar a URL do Facebook pelo Brave.',
+    }
+  }
+}
+
+export async function importSymplaEventAction(input: ImportSymplaEventInput) {
+  const auth = await requireAdmin()
+  if (!auth.ok) return { success: false as const, error: auth.error }
+
+  if (!process.env.BRAVE_API_KEY) {
+    return {
+      success: false as const,
+      error: 'BRAVE_API_KEY não está configurada no ambiente do servidor.',
+    }
+  }
+
+  const normalizedUrl = normalizeSymplaUrl(cleanText(input.url, 1500))
+  const city = cleanText(input.city, 100)
+  const state = cleanText(input.state, 30).toUpperCase()
+  const periodDays = normalizePeriodDays(Number(input.periodDays))
+
+  if (!normalizedUrl) {
+    return {
+      success: false as const,
+      error: 'Informe uma URL válida de evento da Sympla.',
+    }
+  }
+
+  if (!city) {
+    return {
+      success: false as const,
+      error: 'Informe a cidade para ajudar a interpretar o evento.',
+    }
+  }
+
+  try {
+    const { numericId, slugText } = symplaLookupParts(normalizedUrl)
+    const queries = [
+      `"${normalizedUrl}"`,
+      numericId ? `site:sympla.com.br/evento "${numericId}"` : '',
+      slugText ? `site:sympla.com.br/evento "${slugText}" "${city}"` : '',
+    ].filter(Boolean)
+
+    const results: BraveWebResult[] = []
+
+    for (const query of queries) {
+      const found = await searchBraveWeb(query, 10)
+      results.push(...found)
+
+      if (
+        found.some(
+          (result) =>
+            normalizeSymplaUrl(result.url || '') &&
+            symplaResultScore(result, normalizedUrl, numericId, slugText) >= 70
+        )
+      ) {
+        break
+      }
+    }
+
+    const symplaResults = results
+      .filter((result) => normalizeSymplaUrl(result.url || ''))
+      .sort(
+        (a, b) =>
+          symplaResultScore(b, normalizedUrl, numericId, slugText) -
+          symplaResultScore(a, normalizedUrl, numericId, slugText)
+      )
+
+    const bestScore = symplaResults[0]
+      ? symplaResultScore(symplaResults[0], normalizedUrl, numericId, slugText)
+      : 0
+
+    if (symplaResults.length === 0 || bestScore < 20) {
+      return {
+        success: false as const,
+        error:
+          'O Brave ainda não encontrou esta página da Sympla com confiança suficiente. Tente a busca geral por cidade ou tente novamente mais tarde.',
+      }
+    }
+
+    const normalized = await normalizeBraveResult(
+      symplaResults[0],
+      {
+        city,
+        state: state || undefined,
+        periodDays,
+        sourceType: 'sympla',
+        forceEvent: true,
+      },
+      false
+    )
+
+    if (!normalized) {
+      return {
+        success: false as const,
+        error: 'A URL foi localizada, mas não foi possível montar um candidato de evento.',
+      }
+    }
+
+    normalized.source_url = normalizedUrl
+    normalized.source_domain = new URL(normalizedUrl).hostname.replace(/^www\./, '').toLowerCase()
+    normalized.source_type = 'sympla'
+    normalized.confidence = Math.min(normalized.confidence + 10, 100)
+    normalized.raw_data = {
+      ...normalized.raw_data,
+      manual_sympla_url: normalizedUrl,
+      brave_result_url: symplaResults[0].url,
+    }
+
+    const { error: insertError } = await auth.supabase
+      .from('event_candidates')
+      .upsert(normalized, {
+        onConflict: 'source_url',
+        ignoreDuplicates: true,
+      })
+
+    if (insertError) {
+      return { success: false as const, error: databaseSetupMessage(insertError) }
+    }
+
+    const { data: matches, error: candidateError } = await auth.supabase
+      .from('event_candidates')
+      .select('*')
+      .eq('source_url', normalizedUrl)
+      .limit(1)
+
+    if (candidateError || !matches?.[0]) {
+      return {
+        success: false as const,
+        error: databaseSetupMessage(candidateError) || 'Não foi possível carregar o candidato importado.',
+      }
+    }
+
+    const candidate = matches[0] as EventDiscoveryCandidate
+
+    if (candidate.status === 'rejected') {
+      return {
+        success: false as const,
+        error: 'Esta URL já foi recusada anteriormente e permanece bloqueada na fila.',
+      }
+    }
+
+    if (candidate.status === 'approved') {
+      return {
+        success: false as const,
+        error: 'Esta URL da Sympla já foi aprovada e publicada anteriormente.',
+      }
+    }
+
+    return {
+      success: true as const,
+      candidate,
+    }
+  } catch (error) {
+    console.error('Erro ao importar URL da Sympla:', error)
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Erro inesperado ao localizar a URL da Sympla pelo Brave.',
     }
   }
 }

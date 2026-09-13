@@ -134,7 +134,9 @@ export default function DiscoveredEventCard({
               ? 'Reddit'
               : candidate.source_type === 'facebook'
                 ? 'Facebook'
-                : 'Web'}
+                : candidate.source_type === 'sympla'
+                  ? 'Sympla'
+                  : 'Web'}
           </span>
           <span className={styles.confidenceBadge}>
             {candidate.confidence}% · {confidenceLabel}
