@@ -185,12 +185,10 @@ export default function HomePage() {
         {/* Layer 0: Background image with subtle cinematic zoom */}
         <div className={styles.heroBgImage} />
 
-        {/* Layer 1: Ambient nightclub lights — real animated nightclub lights */}
+        {/* Layer 1: Ambient nightclub lights — no strobe/flashing */}
         <div className={styles.clubLights} aria-hidden="true">
           <span className={`${styles.clubLight} ${styles.clubLightA}`} />
-          <span className={`${styles.clubLight} ${styles.clubLightB}`} />
           <span className={`${styles.clubLight} ${styles.clubLightC}`} />
-          <span className={`${styles.clubLight} ${styles.clubLightD}`} />
           <span className={`${styles.clubLight} ${styles.clubLightE}`} />
         </div>
 
