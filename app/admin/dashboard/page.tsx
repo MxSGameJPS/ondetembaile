@@ -171,10 +171,10 @@ export default function AdminDashboardPage() {
         ? ` Algumas fontes tiveram avisos: ${res.warnings.join(' | ')}`
         : ''
       const apifyText = res.apifyUsage
-        ? ` Facebook/Apify: ${res.apifyUsage.resultItems} post(s) coletado(s), ${res.apifyUsage.filteredPosts} enviado(s) para classificação, custo estimado desta busca US$ ${res.apifyUsage.estimatedCostUsd.toFixed(2)} e total mensal estimado US$ ${res.apifyUsage.monthlyEstimatedCostUsd.toFixed(2)} de US$ ${res.apifyUsage.monthlyBudgetUsd.toFixed(2)}.`
+        ? ` Facebook/Apify: ${res.apifyUsage.resultItems} post(s) coletado(s), ${res.apifyUsage.queuedPosts} colocado(s) diretamente na fila para revisão manual, custo estimado desta busca US$ ${res.apifyUsage.estimatedCostUsd.toFixed(2)} e total mensal estimado US$ ${res.apifyUsage.monthlyEstimatedCostUsd.toFixed(2)} de US$ ${res.apifyUsage.monthlyBudgetUsd.toFixed(2)}.`
         : ''
       setDiscoverySummary(
-        `Foram processados ${res.searched} resultado(s), aceitando ${res.found} evento(s) dentro de ${res.window.start} a ${res.window.end}.${apifyText}${warningText}`
+        `Foram processados ${res.searched} resultado(s) e ${res.found} candidato(s) foram adicionados/atualizados na fila.${apifyText}${warningText}`
       )
     } else {
       setDiscoveryError(res.error)
@@ -216,7 +216,7 @@ export default function AdminDashboardPage() {
     })
     setFacebookUrl('')
     setDiscoverySummary(
-      'URL do Facebook pesquisada e validada pela Groq. O evento foi adicionado à fila de revisão.'
+      'URL do Facebook adicionada diretamente à fila de revisão, sem uso de IA.'
     )
   }
 
@@ -568,11 +568,11 @@ export default function AdminDashboardPage() {
               <div>
                 <div className={styles.discoveryEyebrow}>
                   <Sparkles size={15} />
-                  <span>Descoberta com Groq + busca em tempo real</span>
+                  <span>Descoberta com Apify + Groq por fonte</span>
                 </div>
                 <h2>Encontrar eventos em fontes públicas</h2>
                 <p>
-                  A Groq pesquisa as fontes, rejeita páginas de guia/listagem e só aceita eventos com data e horário comprovados dentro da janela escolhida.
+                  Facebook usa somente Apify e todos os posts coletados vão para revisão manual. As demais fontes continuam usando Groq para descoberta e validação.
                 </p>
               </div>
 
@@ -656,7 +656,7 @@ export default function AdminDashboardPage() {
                   disabled={discovering}
                 />
                 <Share2 size={15} />
-                <span>Facebook</span>
+                <span>Facebook (Apify, revisão manual)</span>
               </label>
 
               <label className={styles.sourceOption}>
@@ -689,7 +689,7 @@ export default function AdminDashboardPage() {
                   <span>Importar URL do Facebook</span>
                 </div>
                 <p>
-                  Cole o link público. A Groq tenta localizar e validar o conteúdo em tempo real, inclusive links /share/, sem inventar dados quando a Meta bloquear o acesso.
+                  Cole qualquer link público do Facebook para colocá-lo diretamente na fila. Nenhuma IA é usada; o administrador confere e completa os dados manualmente.
                 </p>
               </div>
 

@@ -8,7 +8,7 @@ import {
   APIFY_MONTHLY_INTERNAL_BUDGET_USD,
   searchFacebookPostsWithApify,
 } from '@/lib/apify/facebook-posts'
-import { extractFacebookEventsFromPosts } from '@/lib/event-discovery/facebook-posts'
+import { mapFacebookPostsToReviewCandidates } from '@/lib/event-discovery/facebook-posts'
 import {
   discoverEventsWithGroq,
   getDiscoveryWindow,
@@ -242,13 +242,6 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
 
-  if (!hasGroqKey()) {
-    return {
-      success: false as const,
-      error: 'API_GROQ_KEY não está configurada no ambiente do servidor.',
-    }
-  }
-
   const city = cleanText(input.city, 100)
   const state = cleanText(input.state, 30).toUpperCase()
   const periodDays = normalizePeriodDays(Number(input.periodDays))
@@ -276,8 +269,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   let apifyUsage:
     | {
         resultItems: number
-        filteredPosts: number
-        analyzedPosts: number
+        queuedPosts: number
         estimatedCostUsd: number
         monthlyEstimatedCostUsd: number
         monthlyBudgetUsd: number
@@ -287,7 +279,13 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   const facebookRequested = sources.includes('facebook')
   const groqSources = sources.filter((source) => source !== 'facebook')
 
-  if (groqSources.length > 0) {
+  if (groqSources.length > 0 && !hasGroqKey()) {
+    warnings.push(
+      'Outras fontes: API_GROQ_KEY não está configurada. O Facebook continuará usando somente a Apify.'
+    )
+  }
+
+  if (groqSources.length > 0 && hasGroqKey()) {
     try {
       const discoveryResult = await discoverEventsWithGroq({
         city,
@@ -350,11 +348,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
               )
             }
 
-            const facebookResult = await extractFacebookEventsFromPosts({
+            const facebookResult = mapFacebookPostsToReviewCandidates({
               posts: apifyResult.posts,
               city,
               state: state || undefined,
-              periodDays,
             })
 
             discovered.push(...facebookResult.candidates)
@@ -362,8 +359,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
 
             apifyUsage = {
               resultItems: apifyResult.resultItems,
-              filteredPosts: facebookResult.filteredPosts,
-              analyzedPosts: facebookResult.analyzedPosts,
+              queuedPosts: facebookResult.queuedPosts,
               estimatedCostUsd: apifyResult.estimatedCostUsd,
               monthlyEstimatedCostUsd: Number(
                 (usage.spend + apifyResult.estimatedCostUsd).toFixed(4)
@@ -410,9 +406,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     .select('*')
     .eq('status', 'pending')
     .ilike('city', `%${city}%`)
-    .gte('event_date', startIso)
-    .lte('event_date', endIso)
-    .order('event_date', { ascending: true })
+    .order('found_at', { ascending: false })
     .limit(80)
 
   if (state) {
@@ -425,9 +419,26 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return { success: false as const, error: databaseSetupMessage(candidatesError) }
   }
 
+  const preparedCandidates = prepareCandidates(
+    (candidates ?? []) as EventDiscoveryCandidate[]
+  ).filter((candidate) => {
+    if (candidate.source_type === 'facebook') return true
+    if (!candidate.event_date) return false
+
+    const eventTime = new Date(candidate.event_date).getTime()
+    const startTime = new Date(startIso).getTime()
+    const endTime = new Date(endIso).getTime()
+
+    return (
+      !Number.isNaN(eventTime) &&
+      eventTime >= startTime &&
+      eventTime <= endTime
+    )
+  })
+
   return {
     success: true as const,
-    candidates: prepareCandidates((candidates ?? []) as EventDiscoveryCandidate[]),
+    candidates: preparedCandidates,
     found: candidatesToSave.length,
     searched,
     warnings,
@@ -534,7 +545,98 @@ async function importUrlWithGroq(
 }
 
 export async function importFacebookEventAction(input: ImportFacebookEventInput) {
-  return importUrlWithGroq('facebook', input)
+  const auth = await requireAdmin()
+  if (!auth.ok) return { success: false as const, error: auth.error }
+
+  const url = cleanText(input.url, 1500)
+  const city = cleanText(input.city, 100)
+  const state = cleanText(input.state, 30).toUpperCase()
+
+  if (!url) {
+    return { success: false as const, error: 'Informe uma URL do Facebook.' }
+  }
+
+  if (!city) {
+    return {
+      success: false as const,
+      error: 'Informe a cidade para adicionar o post à fila de revisão.',
+    }
+  }
+
+  let normalizedUrl = ''
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+
+    if (
+      !(
+        host === 'facebook.com' ||
+        host.endsWith('.facebook.com') ||
+        host === 'fb.com' ||
+        host.endsWith('.fb.com')
+      )
+    ) {
+      return { success: false as const, error: 'Informe uma URL válida do Facebook.' }
+    }
+
+    parsed.hash = ''
+    normalizedUrl = parsed.toString()
+  } catch {
+    return { success: false as const, error: 'Informe uma URL válida do Facebook.' }
+  }
+
+  const candidate = {
+    title: 'Post do Facebook para revisão',
+    description:
+      'URL adicionada manualmente. Abra a fonte, confira os dados do evento e complete os campos antes de aprovar.',
+    event_date: null,
+    location_name: null,
+    address: [city, state].filter(Boolean).join(', '),
+    city,
+    state: state || null,
+    category_name: null,
+    image_url: null,
+    ticket_price: null,
+    whatsapp_info: null,
+    source_url: normalizedUrl,
+    source_domain: 'facebook.com',
+    source_type: 'facebook' as const,
+    source_title: 'Facebook',
+    source_snippet:
+      'Post adicionado manualmente à fila. Nenhuma IA foi usada para interpretar esta URL.',
+    confidence: 10,
+    raw_data: {
+      discovery_engine: 'manual-facebook-review',
+      review_required: true,
+      city_source: 'admin_input',
+    },
+  }
+
+  const insertError = await upsertCandidates(auth.supabase as any, [
+    candidate as unknown as GroqEventCandidate,
+  ])
+
+  if (insertError) {
+    return { success: false as const, error: databaseSetupMessage(insertError) }
+  }
+
+  const { data: matches, error } = await auth.supabase
+    .from('event_candidates')
+    .select('*')
+    .eq('source_url', normalizedUrl)
+    .limit(1)
+
+  if (error || !matches?.[0]) {
+    return {
+      success: false as const,
+      error: databaseSetupMessage(error) || 'Não foi possível adicionar o post à fila.',
+    }
+  }
+
+  return {
+    success: true as const,
+    candidate: matches[0] as EventDiscoveryCandidate,
+  }
 }
 
 export async function importSymplaEventAction(input: ImportSymplaEventInput) {
