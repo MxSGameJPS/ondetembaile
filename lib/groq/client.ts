@@ -32,7 +32,7 @@ function sleep(ms: number) {
 
 function friendlyGroqError(status: number, message: string, retryAfter: string | null) {
   if (status === 429) {
-    const seconds = retryAfter ? Math.ceil(Number(retryAfter)) : null
+    const seconds = retryAfter ? Math.ceil(Number.parseFloat(retryAfter)) : null
     const waitText =
       seconds && Number.isFinite(seconds)
         ? ` Aguarde cerca de ${seconds}s e tente novamente.`
@@ -79,7 +79,7 @@ async function callGroq(body: Record<string, unknown>, retry = true) {
     const retryAfter = response.headers.get('retry-after')
 
     if (response.status === 429 && retry && retryAfter) {
-      const seconds = Number(retryAfter)
+      const seconds = Number.parseFloat(retryAfter)
 
       if (Number.isFinite(seconds) && seconds > 0 && seconds <= 10) {
         await sleep(Math.ceil(seconds * 1000) + 250)
