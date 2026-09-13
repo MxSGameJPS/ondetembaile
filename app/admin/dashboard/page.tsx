@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
 import DiscoveredEventCard from '@/components/admin/DiscoveredEventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle } from 'lucide-react'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2 } from 'lucide-react'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
 import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
@@ -12,6 +12,7 @@ import {
   approveDiscoveryCandidateAction,
   discoverEventsAction,
   getDiscoveryCandidatesAction,
+  importFacebookEventAction,
   rejectDiscoveryCandidateAction,
   updateDiscoveryCandidateAction,
 } from '@/app/actions/event-discovery'
@@ -51,7 +52,9 @@ export default function AdminDashboardPage() {
   const [discoverCity, setDiscoverCity] = useState('')
   const [discoverState, setDiscoverState] = useState('RS')
   const [discoverPeriod, setDiscoverPeriod] = useState(30)
-  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit'])
+  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit', 'facebook'])
+  const [facebookUrl, setFacebookUrl] = useState('')
+  const [importingFacebook, setImportingFacebook] = useState(false)
   const [discovering, setDiscovering] = useState(false)
   const [candidateBusyId, setCandidateBusyId] = useState<string | null>(null)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
@@ -164,6 +167,45 @@ export default function AdminDashboardPage() {
     } else {
       setDiscoveryError(res.error)
     }
+  }
+
+  const handleImportFacebookUrl = async () => {
+    if (!facebookUrl.trim()) {
+      setDiscoveryError('Cole uma URL pública do Facebook para importar.')
+      return
+    }
+
+    if (!discoverCity.trim()) {
+      setDiscoveryError('Informe a cidade antes de importar a URL do Facebook.')
+      return
+    }
+
+    setImportingFacebook(true)
+    setDiscoveryError(null)
+    setDiscoverySummary(null)
+
+    const res = await importFacebookEventAction({
+      url: facebookUrl,
+      city: discoverCity,
+      state: discoverState,
+      periodDays: discoverPeriod,
+    })
+
+    setImportingFacebook(false)
+
+    if (!res.success) {
+      setDiscoveryError(res.error)
+      return
+    }
+
+    setCandidateEvents((current) => {
+      const withoutImported = current.filter((candidate) => candidate.id !== res.candidate.id)
+      return [res.candidate, ...withoutImported]
+    })
+    setFacebookUrl('')
+    setDiscoverySummary(
+      'URL do Facebook localizada pelo Brave e adicionada à fila de revisão. Confira os dados antes de publicar.'
+    )
   }
 
   const handleCandidateSave = async (
@@ -440,7 +482,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <h2>Encontrar eventos em fontes públicas</h2>
                 <p>
-                  Busque Web e Reddit, revise os dados encontrados e publique somente o que for aprovado.
+                  Busque Web, Reddit e páginas públicas indexadas do Facebook. Revise os dados antes de publicar.
                 </p>
               </div>
 
@@ -516,6 +558,48 @@ export default function AdminDashboardPage() {
                 <MessageCircle size={15} />
                 <span>Reddit</span>
               </label>
+
+              <label className={styles.sourceOption}>
+                <input
+                  type="checkbox"
+                  checked={discoverSources.includes('facebook')}
+                  onChange={() => toggleDiscoverySource('facebook')}
+                  disabled={discovering}
+                />
+                <Share2 size={15} />
+                <span>Facebook</span>
+              </label>
+            </div>
+
+            <div className={styles.facebookImport}>
+              <div className={styles.facebookImportCopy}>
+                <div className={styles.facebookImportTitle}>
+                  <Link2 size={15} />
+                  <span>Importar URL do Facebook</span>
+                </div>
+                <p>
+                  Cole o link de um evento ou publicação pública. O sistema procura a URL no índice do Brave sem acessar o Facebook diretamente.
+                </p>
+              </div>
+
+              <div className={styles.facebookImportForm}>
+                <input
+                  type="url"
+                  value={facebookUrl}
+                  placeholder="https://www.facebook.com/events/..."
+                  onChange={(event) => setFacebookUrl(event.target.value)}
+                  disabled={importingFacebook || discovering}
+                />
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={handleImportFacebookUrl}
+                  disabled={importingFacebook || discovering || !facebookUrl.trim()}
+                >
+                  <Search size={16} />
+                  <span>{importingFacebook ? 'Localizando...' : 'Importar URL'}</span>
+                </button>
+              </div>
             </div>
           </div>
 

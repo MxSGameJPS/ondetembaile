@@ -12,6 +12,7 @@ import type {
   DiscoverEventsInput,
   DiscoverySource,
   EventDiscoveryCandidate,
+  ImportFacebookEventInput,
   UpdateDiscoveryCandidateInput,
 } from '@/types/event-discovery'
 
@@ -45,15 +46,75 @@ function buildSearchQuery(source: DiscoverySource, city: string, state: string, 
     return `site:reddit.com ${terms} ${location} ${period}`
   }
 
+  if (source === 'facebook') {
+    return `site:facebook.com ${terms} ${location} ${period}`
+  }
+
   return `${terms} ${location} ${period}`
 }
 
 function databaseSetupMessage(error?: { code?: string; message?: string } | null) {
-  if (error?.code === '42P01' || String(error?.message ?? '').includes('event_candidates')) {
-    return 'A estrutura de descoberta ainda não foi aplicada no Supabase. Execute o arquivo supabase/event_discovery_setup.sql no projeto antes de usar esta aba.'
+  const message = String(error?.message ?? '')
+
+  if (
+    error?.code === '42P01' ||
+    message.includes('event_candidates') ||
+    (error?.code === '23514' && message.includes('source_type'))
+  ) {
+    return 'A estrutura de descoberta precisa ser atualizada no Supabase. Execute a versão atual de supabase/event_discovery_setup.sql antes de usar esta fonte.'
   }
 
   return error?.message || 'Erro ao acessar a fila de eventos encontrados.'
+}
+
+function normalizeFacebookUrl(value: string) {
+  try {
+    const normalized = normalizeSourceUrl(value)
+    if (!normalized) return null
+
+    const url = new URL(normalized)
+    const hostname = url.hostname.toLowerCase()
+
+    const isFacebook =
+      hostname === 'facebook.com' ||
+      hostname.endsWith('.facebook.com') ||
+      hostname === 'fb.com' ||
+      hostname.endsWith('.fb.com')
+
+    if (!isFacebook) return null
+
+    return normalized
+  } catch {
+    return null
+  }
+}
+
+function facebookLookupTerm(value: string) {
+  try {
+    const url = new URL(value)
+    const segments = url.pathname.split('/').filter(Boolean)
+    const eventsIndex = segments.findIndex((segment) => segment.toLowerCase() === 'events')
+
+    if (eventsIndex >= 0 && segments[eventsIndex + 1]) {
+      return segments[eventsIndex + 1]
+    }
+
+    return segments.slice(-2).join(' ') || url.hostname
+  } catch {
+    return value
+  }
+}
+
+function facebookResultScore(result: BraveWebResult, normalizedUrl: string, lookupTerm: string) {
+  const resultUrl = normalizeSourceUrl(result.url || '')
+  let score = 0
+
+  if (resultUrl === normalizedUrl) score += 100
+  if (lookupTerm && resultUrl.includes(lookupTerm)) score += 50
+  if (/\/events(?:\/|$)/i.test(resultUrl)) score += 20
+  if ((result.description || '').toLowerCase().includes('evento')) score += 5
+
+  return score
 }
 
 export async function getDiscoveryCandidatesAction() {
@@ -93,7 +154,8 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   const state = cleanText(input.state, 30).toUpperCase()
   const periodDays = normalizePeriodDays(Number(input.periodDays))
   const sources = Array.from(new Set(input.sources)).filter(
-    (source): source is DiscoverySource => source === 'web' || source === 'reddit'
+    (source): source is DiscoverySource =>
+      source === 'web' || source === 'reddit' || source === 'facebook'
   )
 
   if (!city) {
@@ -108,7 +170,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     const sourceResults = await Promise.all(
       sources.map(async (source) => {
         const query = buildSearchQuery(source, city, state, periodDays)
-        const results = await searchBraveWeb(query, source === 'reddit' ? 12 : 18)
+        const results = await searchBraveWeb(
+          query,
+          source === 'reddit' ? 12 : source === 'facebook' ? 14 : 18
+        )
         return results.map((result) => ({ result, source }))
       })
     )
@@ -185,6 +250,164 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return {
       success: false as const,
       error: error instanceof Error ? error.message : 'Erro inesperado ao consultar fontes públicas.',
+    }
+  }
+}
+
+export async function importFacebookEventAction(input: ImportFacebookEventInput) {
+  const auth = await requireAdmin()
+  if (!auth.ok) return { success: false as const, error: auth.error }
+
+  if (!process.env.BRAVE_API_KEY) {
+    return {
+      success: false as const,
+      error: 'BRAVE_API_KEY não está configurada no ambiente do servidor.',
+    }
+  }
+
+  const normalizedUrl = normalizeFacebookUrl(cleanText(input.url, 1500))
+  const city = cleanText(input.city, 100)
+  const state = cleanText(input.state, 30).toUpperCase()
+  const periodDays = normalizePeriodDays(Number(input.periodDays))
+
+  if (!normalizedUrl) {
+    return {
+      success: false as const,
+      error: 'Informe uma URL válida do Facebook.',
+    }
+  }
+
+  if (!city) {
+    return {
+      success: false as const,
+      error: 'Informe a cidade para ajudar a interpretar o evento.',
+    }
+  }
+
+  try {
+    const lookupTerm = facebookLookupTerm(normalizedUrl)
+    const queries = [
+      `site:facebook.com "${lookupTerm}"`,
+      `site:facebook.com "${lookupTerm}" "${city}"`,
+    ]
+
+    let results: BraveWebResult[] = []
+
+    for (const query of queries) {
+      const found = await searchBraveWeb(query, 10)
+      results.push(...found)
+
+      if (
+        found.some((result) => {
+          const url = normalizeFacebookUrl(result.url || '')
+          return url && facebookResultScore(result, normalizedUrl, lookupTerm) >= 50
+        })
+      ) {
+        break
+      }
+    }
+
+    const facebookResults = results
+      .filter((result) => normalizeFacebookUrl(result.url || ''))
+      .sort(
+        (a, b) =>
+          facebookResultScore(b, normalizedUrl, lookupTerm) -
+          facebookResultScore(a, normalizedUrl, lookupTerm)
+      )
+
+    const bestScore = facebookResults[0]
+      ? facebookResultScore(facebookResults[0], normalizedUrl, lookupTerm)
+      : 0
+
+    if (facebookResults.length === 0 || bestScore < 20) {
+      return {
+        success: false as const,
+        error:
+          'O Brave ainda não encontrou esta URL do Facebook com confiança suficiente no índice público. Tente novamente mais tarde ou use a busca geral por cidade.',
+      }
+    }
+
+    const normalized = await normalizeBraveResult(
+      facebookResults[0],
+      {
+        city,
+        state: state || undefined,
+        periodDays,
+        sourceType: 'facebook',
+        forceEvent: true,
+      },
+      false
+    )
+
+    if (!normalized) {
+      return {
+        success: false as const,
+        error: 'A URL foi localizada, mas não foi possível montar um candidato de evento.',
+      }
+    }
+
+    normalized.source_url = normalizedUrl
+    normalized.source_domain = new URL(normalizedUrl).hostname.replace(/^www\./, '').toLowerCase()
+    normalized.source_type = 'facebook'
+    normalized.confidence = Math.min(normalized.confidence + 8, 100)
+    normalized.raw_data = {
+      ...normalized.raw_data,
+      manual_facebook_url: normalizedUrl,
+      brave_result_url: facebookResults[0].url,
+    }
+
+    const { error: insertError } = await auth.supabase
+      .from('event_candidates')
+      .upsert(normalized, {
+        onConflict: 'source_url',
+        ignoreDuplicates: true,
+      })
+
+    if (insertError) {
+      return { success: false as const, error: databaseSetupMessage(insertError) }
+    }
+
+    const { data: matches, error: candidateError } = await auth.supabase
+      .from('event_candidates')
+      .select('*')
+      .eq('source_url', normalizedUrl)
+      .limit(1)
+
+    if (candidateError || !matches?.[0]) {
+      return {
+        success: false as const,
+        error: databaseSetupMessage(candidateError) || 'Não foi possível carregar o candidato importado.',
+      }
+    }
+
+    const candidate = matches[0] as EventDiscoveryCandidate
+
+    if (candidate.status === 'rejected') {
+      return {
+        success: false as const,
+        error: 'Esta URL já foi recusada anteriormente e permanece bloqueada na fila.',
+      }
+    }
+
+    if (candidate.status === 'approved') {
+      return {
+        success: false as const,
+        error: 'Esta URL do Facebook já foi aprovada e publicada anteriormente.',
+      }
+    }
+
+    return {
+      success: true as const,
+      candidate,
+    }
+  } catch (error) {
+    console.error('Erro ao importar URL do Facebook:', error)
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Erro inesperado ao localizar a URL do Facebook pelo Brave.',
     }
   }
 }
@@ -300,7 +523,7 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
       event_date: candidate.event_date,
       ticket_price: candidate.ticket_price || 'Consultar',
       whatsapp_info: candidate.whatsapp_info || '',
-      facebook_url: null,
+      facebook_url: candidate.source_type === 'facebook' ? candidate.source_url : null,
       instagram_handle: null,
       origin: 'discovered',
       source_url: candidate.source_url,

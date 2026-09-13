@@ -129,7 +129,13 @@ export default function DiscoveredEventCard({
         {!draft.image_url && <Globe2 size={28} />}
         <div className={styles.imageOverlay} />
         <div className={styles.badges}>
-          <span className={styles.sourceBadge}>{candidate.source_type === 'reddit' ? 'Reddit' : 'Web'}</span>
+          <span className={styles.sourceBadge}>
+            {candidate.source_type === 'reddit'
+              ? 'Reddit'
+              : candidate.source_type === 'facebook'
+                ? 'Facebook'
+                : 'Web'}
+          </span>
           <span className={styles.confidenceBadge}>
             {candidate.confidence}% · {confidenceLabel}
           </span>

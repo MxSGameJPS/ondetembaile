@@ -210,6 +210,63 @@
   accent-color: #f26a00;
 }
 
+.facebookImport {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.facebookImportCopy {
+  min-width: 0;
+}
+
+.facebookImportTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.facebookImportCopy p {
+  margin: 0.3rem 0 0;
+  max-width: 680px;
+  color: #6b7280;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.facebookImportForm {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+  max-width: 620px;
+}
+
+.facebookImportForm input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #303036;
+  border-radius: 10px;
+  outline: none;
+  background: #17171b;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.68rem 0.75rem;
+}
+
+.facebookImportForm input:focus {
+  border-color: rgba(242, 106, 0, 0.78);
+  box-shadow: 0 0 0 3px rgba(242, 106, 0, 0.1);
+}
+
 .discoveryError,
 .discoverySummary {
   border-radius: 11px;
@@ -297,9 +354,27 @@
     flex-direction: column;
   }
 
-  .discoveryPanelHeader button {
+  .facebookImport {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .facebookImportForm {
+    max-width: none;
+  }
+
+  .discoveryPanelHeader button,
+  .facebookImportForm button {
     width: 100%;
     justify-content: center;
+  }
+
+  .facebookImportForm {
+    flex-direction: column;
+  }
+
+  .facebookImportForm input {
+    width: 100%;
   }
 
   .discoveryForm {
