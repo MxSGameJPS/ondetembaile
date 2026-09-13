@@ -3,6 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/admin'
 import {
+  APIFY_ESTIMATED_COST_PER_ITEM_USD,
+  APIFY_FACEBOOK_RESULTS_PER_RUN,
+  APIFY_MONTHLY_INTERNAL_BUDGET_USD,
+  searchFacebookPostsWithApify,
+} from '@/lib/apify/facebook-posts'
+import { extractFacebookEventsFromPosts } from '@/lib/event-discovery/facebook-posts'
+import {
   discoverEventsWithGroq,
   getDiscoveryWindow,
   inspectEventUrlWithGroqCompound,
@@ -34,6 +41,7 @@ function databaseSetupMessage(error?: { code?: string; message?: string } | null
   if (
     error?.code === '42P01' ||
     message.includes('event_candidates') ||
+    message.includes('discovery_api_usage') ||
     (error?.code === '23514' && message.includes('source_type'))
   ) {
     return 'A estrutura de descoberta precisa ser atualizada no Supabase. Execute a versão atual de supabase/event_discovery_setup.sql antes de usar esta fonte.'
@@ -44,6 +52,65 @@ function databaseSetupMessage(error?: { code?: string; message?: string } | null
 
 function hasGroqKey() {
   return Boolean(process.env.API_GROQ_KEY || process.env.GROQ_API_KEY)
+}
+
+function hasApifyKey() {
+  return Boolean(process.env.API_KEY_APIFY)
+}
+
+function currentMonthStartIso() {
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
+}
+
+async function getApifyMonthlySpend(supabase: any) {
+  const { data, error } = await supabase
+    .from('discovery_api_usage')
+    .select('estimated_cost_usd')
+    .eq('provider', 'apify')
+    .gte('ran_at', currentMonthStartIso())
+
+  if (error) {
+    return {
+      ok: false as const,
+      error: databaseSetupMessage(error),
+    }
+  }
+
+  const spend = (data ?? []).reduce(
+    (total: number, row: { estimated_cost_usd?: number | string | null }) =>
+      total + Number(row.estimated_cost_usd || 0),
+    0
+  )
+
+  return {
+    ok: true as const,
+    spend: Number(spend.toFixed(4)),
+  }
+}
+
+async function recordApifyUsage(
+  supabase: any,
+  input: {
+    resultItems: number
+    estimatedCostUsd: number
+    city: string
+    query: string
+  }
+) {
+  const { error } = await supabase.from('discovery_api_usage').insert({
+    provider: 'apify',
+    actor_id: 'scraper_one/facebook-posts-search',
+    result_items: input.resultItems,
+    estimated_cost_usd: input.estimatedCostUsd,
+    metadata: {
+      city: input.city,
+      query: input.query,
+      api_user_id_configured: Boolean(process.env.APIFY_USER_ID),
+    },
+  })
+
+  return error
 }
 
 function normalizeSourceUrl(value: string) {
@@ -202,28 +269,129 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return { success: false as const, error: 'Selecione ao menos uma fonte de busca.' }
   }
 
-  let discoveryResult: Awaited<ReturnType<typeof discoverEventsWithGroq>>
+  const warnings: string[] = []
+  const discovered: GroqEventCandidate[] = []
+  let searched = 0
+  let completedPipelines = 0
+  let apifyUsage:
+    | {
+        resultItems: number
+        filteredPosts: number
+        analyzedPosts: number
+        estimatedCostUsd: number
+        monthlyEstimatedCostUsd: number
+        monthlyBudgetUsd: number
+      }
+    | null = null
 
-  try {
-    discoveryResult = await discoverEventsWithGroq({
-      city,
-      state: state || undefined,
-      periodDays,
-      sources,
-    })
-  } catch (error) {
-    console.error('Erro na descoberta consolidada com Groq:', error)
+  const facebookRequested = sources.includes('facebook')
+  const groqSources = sources.filter((source) => source !== 'facebook')
+
+  if (groqSources.length > 0) {
+    try {
+      const discoveryResult = await discoverEventsWithGroq({
+        city,
+        state: state || undefined,
+        periodDays,
+        sources: groqSources,
+      })
+
+      discovered.push(...discoveryResult.events)
+      searched += discoveryResult.searched
+      completedPipelines += 1
+    } catch (error) {
+      console.error('Erro na descoberta consolidada com Groq:', error)
+      warnings.push(
+        `Web: ${error instanceof Error ? error.message : 'falha inesperada na Groq'}`
+      )
+    }
+  }
+
+  if (facebookRequested) {
+    if (!hasApifyKey()) {
+      warnings.push('Facebook: API_KEY_APIFY não está configurada no servidor.')
+    } else {
+      const usage = await getApifyMonthlySpend(auth.supabase)
+
+      if (!usage.ok) {
+        warnings.push(`Facebook: ${usage.error}`)
+      } else {
+        const maximumRunEstimate =
+          APIFY_FACEBOOK_RESULTS_PER_RUN * APIFY_ESTIMATED_COST_PER_ITEM_USD
+
+        if (
+          usage.spend + maximumRunEstimate >
+          APIFY_MONTHLY_INTERNAL_BUDGET_USD
+        ) {
+          warnings.push(
+            `Facebook: orçamento interno da Apify atingido (US$ ${usage.spend.toFixed(2)} de US$ ${APIFY_MONTHLY_INTERNAL_BUDGET_USD.toFixed(2)}).`
+          )
+        } else {
+          try {
+            const apifyResult = await searchFacebookPostsWithApify({
+              city,
+              query: 'baile',
+              publicationLookbackDays: 30,
+            })
+
+            searched += apifyResult.resultItems
+
+            const usageError = await recordApifyUsage(auth.supabase, {
+              resultItems: apifyResult.resultItems,
+              estimatedCostUsd: apifyResult.estimatedCostUsd,
+              city,
+              query: apifyResult.query,
+            })
+
+            if (usageError) {
+              console.error('Apify executou, mas o uso não pôde ser registrado:', usageError)
+              warnings.push(
+                'Facebook: a busca funcionou, mas não foi possível registrar o consumo mensal da Apify.'
+              )
+            }
+
+            const facebookResult = await extractFacebookEventsFromPosts({
+              posts: apifyResult.posts,
+              city,
+              state: state || undefined,
+              periodDays,
+            })
+
+            discovered.push(...facebookResult.candidates)
+            completedPipelines += 1
+
+            apifyUsage = {
+              resultItems: apifyResult.resultItems,
+              filteredPosts: facebookResult.filteredPosts,
+              analyzedPosts: facebookResult.analyzedPosts,
+              estimatedCostUsd: apifyResult.estimatedCostUsd,
+              monthlyEstimatedCostUsd: Number(
+                (usage.spend + apifyResult.estimatedCostUsd).toFixed(4)
+              ),
+              monthlyBudgetUsd: APIFY_MONTHLY_INTERNAL_BUDGET_USD,
+            }
+          } catch (error) {
+            console.error('Erro na descoberta do Facebook com Apify:', error)
+            warnings.push(
+              `Facebook: ${error instanceof Error ? error.message : 'falha inesperada na Apify'}`
+            )
+          }
+        }
+      }
+    }
+  }
+
+  if (completedPipelines === 0) {
     return {
       success: false as const,
       error:
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível concluir a busca de eventos com a Groq.',
+        warnings.join(' | ') ||
+        'Nenhuma fonte conseguiu concluir a descoberta de eventos.',
     }
   }
 
   const unique = new Map<string, GroqEventCandidate>()
-  for (const candidate of discoveryResult.events) {
+  for (const candidate of discovered) {
     unique.set(normalizeSourceUrl(candidate.source_url), candidate)
   }
   const candidatesToSave = Array.from(unique.values())
@@ -261,9 +429,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     success: true as const,
     candidates: prepareCandidates((candidates ?? []) as EventDiscoveryCandidate[]),
     found: candidatesToSave.length,
-    searched: discoveryResult.searched,
-    warnings: [] as string[],
+    searched,
+    warnings,
     window,
+    apifyUsage,
   }
 }
 
