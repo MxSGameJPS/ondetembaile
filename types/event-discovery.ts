@@ -1,4 +1,4 @@
-export type DiscoverySource = 'web' | 'reddit'
+export type DiscoverySource = 'web' | 'reddit' | 'facebook'
 
 export type DiscoveryCandidateStatus = 'pending' | 'approved' | 'rejected'
 
@@ -7,6 +7,13 @@ export interface DiscoverEventsInput {
   state?: string
   periodDays: number
   sources: DiscoverySource[]
+}
+
+export interface ImportFacebookEventInput {
+  url: string
+  city: string
+  state?: string
+  periodDays: number
 }
 
 export interface EventDiscoveryCandidate {
