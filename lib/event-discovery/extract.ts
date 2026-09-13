@@ -81,6 +81,7 @@ function truncate(value: string, maxLength: number) {
 export function normalizeSourceUrl(value: string) {
   try {
     const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol)) return ''
     url.hash = ''
 
     const removable = [
@@ -404,6 +405,8 @@ export async function normalizeBraveResult(
   if (!result.url || !result.title) return null
 
   const sourceUrl = normalizeSourceUrl(result.url)
+  if (!sourceUrl) return null
+
   const sourceDomain = getDomain(sourceUrl)
   const sourceType = resolveSourceType(sourceUrl, context.sourceType)
   const braveText = decodeHtml(
