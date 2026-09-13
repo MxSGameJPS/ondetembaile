@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, MapPin, Ticket, MessageCircle, ArrowRight } from 'lucide-react'
+import { Calendar, MapPin, Ticket, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import styles from './EventCard.module.css'
 
 export interface EventItem {
@@ -17,7 +17,10 @@ export interface EventItem {
   image_url: string
   event_date: string
   ticket_price: string
-  whatsapp_info: string
+  whatsapp_info?: string | null
+  source_url?: string | null
+  source_domain?: string | null
+  origin?: 'producer' | 'admin' | 'discovered'
   status?: string
   rejection_reason?: string | null
 }
@@ -126,15 +129,29 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
         ) : (
           /* Footer Actions */
           <div className={styles.footer}>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.whatsappBtn}
-            >
-              <MessageCircle size={14} />
-              <span>WhatsApp</span>
-            </a>
+            {whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.whatsappBtn}
+              >
+                <MessageCircle size={14} />
+                <span>WhatsApp</span>
+              </a>
+            ) : event.source_url ? (
+              <a
+                href={event.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.whatsappBtn}
+              >
+                <ExternalLink size={14} />
+                <span>Fonte</span>
+              </a>
+            ) : (
+              <span />
+            )}
 
             <Link href={`/evento/${event.id}`} className={styles.detailsBtn}>
               <span>Ver Evento</span>
