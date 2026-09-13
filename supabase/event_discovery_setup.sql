@@ -39,7 +39,7 @@ create table if not exists public.event_candidates (
   whatsapp_info text,
   source_url text not null unique,
   source_domain text,
-  source_type text not null check (source_type in ('web', 'reddit')),
+  source_type text not null check (source_type in ('web', 'reddit', 'facebook')),
   source_title text,
   source_snippet text,
   confidence integer not null default 0 check (confidence between 0 and 100),
@@ -61,6 +61,13 @@ create index if not exists event_candidates_city_status_idx
 create index if not exists event_candidates_event_date_idx
   on public.event_candidates (event_date)
   where event_date is not null;
+
+alter table public.event_candidates
+  drop constraint if exists event_candidates_source_type_check;
+
+alter table public.event_candidates
+  add constraint event_candidates_source_type_check
+  check (source_type in ('web', 'reddit', 'facebook'));
 
 alter table public.event_candidates enable row level security;
 
