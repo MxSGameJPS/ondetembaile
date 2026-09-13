@@ -12,6 +12,11 @@ interface GroqChatResponse {
   }
 }
 
+type GroqMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 interface CompoundJsonOptions {
   enabledTools?: Array<'web_search' | 'visit_website'>
   maxCompletionTokens?: number
@@ -124,4 +129,33 @@ export async function groqCompoundJson<T>(
     console.error('Invalid Groq Compound JSON:', error, content.slice(0, 1000))
     throw new Error('A Groq retornou uma resposta inválida. Tente novamente.')
   }
+}
+
+
+export async function groqBrowserResearch(messages: GroqMessage[]) {
+  return callGroq({
+    model: GROQ_DISCOVERY_MODEL,
+    messages,
+    compound_custom: {
+      tools: {
+        enabled_tools: ['web_search'],
+      },
+    },
+    max_completion_tokens: 3500,
+  })
+}
+
+export async function groqStructuredJson<T>(
+  messages: GroqMessage[],
+  _name: string,
+  _schema: Record<string, unknown>
+): Promise<T> {
+  const prompt = messages
+    .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
+    .join('\n\n')
+
+  return groqCompoundJson<T>(prompt, {
+    enabledTools: ['web_search'],
+    maxCompletionTokens: 3500,
+  })
 }
