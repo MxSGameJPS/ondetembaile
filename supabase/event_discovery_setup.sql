@@ -103,6 +103,39 @@ create policy "Admins can delete event candidates"
   to authenticated
   using ((select private.is_platform_admin()));
 
+
+create table if not exists public.discovery_api_usage (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null check (provider in ('apify')),
+  actor_id text not null,
+  result_items integer not null default 0 check (result_items >= 0),
+  estimated_cost_usd numeric(10, 4) not null default 0 check (estimated_cost_usd >= 0),
+  metadata jsonb not null default '{}'::jsonb,
+  ran_at timestamptz not null default now()
+);
+
+create index if not exists discovery_api_usage_provider_ran_at_idx
+  on public.discovery_api_usage (provider, ran_at desc);
+
+alter table public.discovery_api_usage enable row level security;
+
+revoke all on table public.discovery_api_usage from anon, authenticated;
+grant select, insert on table public.discovery_api_usage to authenticated;
+
+drop policy if exists "Admins can read discovery API usage" on public.discovery_api_usage;
+create policy "Admins can read discovery API usage"
+  on public.discovery_api_usage
+  for select
+  to authenticated
+  using ((select private.is_platform_admin()));
+
+drop policy if exists "Admins can insert discovery API usage" on public.discovery_api_usage;
+create policy "Admins can insert discovery API usage"
+  on public.discovery_api_usage
+  for insert
+  to authenticated
+  with check ((select private.is_platform_admin()));
+
 alter table public.events
   add column if not exists origin text not null default 'producer',
   add column if not exists source_url text,
