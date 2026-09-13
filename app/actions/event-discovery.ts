@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/admin'
-import { searchBraveWeb } from '@/lib/brave/client'
+import { searchBraveWeb, type BraveWebResult } from '@/lib/brave/client'
 import {
   normalizeBraveResult,
   normalizeSourceUrl,
@@ -48,7 +48,7 @@ function buildSearchQuery(source: DiscoverySource, city: string, state: string, 
   return `${terms} ${location} ${period}`
 }
 
-function databaseSetupMessage(error: any) {
+function databaseSetupMessage(error?: { code?: string; message?: string } | null) {
   if (error?.code === '42P01' || String(error?.message ?? '').includes('event_candidates')) {
     return 'A estrutura de descoberta ainda não foi aplicada no Supabase. Execute o arquivo supabase/event_discovery_setup.sql no projeto antes de usar esta aba.'
   }
@@ -113,7 +113,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
       })
     )
 
-    const uniqueResults: Array<{ result: any; source: DiscoverySource }> = []
+    const uniqueResults: Array<{ result: BraveWebResult; source: DiscoverySource }> = []
     const seen = new Set<string>()
 
     for (const item of sourceResults.flat()) {
