@@ -1,0 +1,26 @@
+name: Discovery candidate save build check
+
+on:
+  push:
+    branches:
+      - fix/discovery-candidate-500
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      RESEND_API_KEY: re_test
+      API_GROQ_KEY: gsk_test
+      API_KEY_APIFY: apify_api_test
+      APIFY_USER_ID: test-user
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
