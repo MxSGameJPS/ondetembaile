@@ -9,8 +9,8 @@ import {
   searchFacebookPostsWithApify,
 } from '@/lib/apify/facebook-posts'
 import { mapFacebookPostsToReviewCandidates } from '@/lib/event-discovery/facebook-posts'
+import { discoverEventsWithBrave } from '@/lib/event-discovery/brave-discovery'
 import {
-  discoverEventsWithGroq,
   getDiscoveryWindow,
   inspectEventUrlWithGroqCompound,
   type GroqEventCandidate,
@@ -277,30 +277,25 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     | null = null
 
   const facebookRequested = sources.includes('facebook')
-  const groqSources = sources.filter((source) => source !== 'facebook')
+  const braveSources = sources.filter((source) => source !== 'facebook')
 
-  if (groqSources.length > 0 && !hasGroqKey()) {
-    warnings.push(
-      'Outras fontes: API_GROQ_KEY não está configurada. O Facebook continuará usando somente a Apify.'
-    )
-  }
-
-  if (groqSources.length > 0 && hasGroqKey()) {
+  if (braveSources.length > 0) {
     try {
-      const discoveryResult = await discoverEventsWithGroq({
+      const discoveryResult = await discoverEventsWithBrave({
         city,
         state: state || undefined,
         periodDays,
-        sources: groqSources,
+        sources: braveSources,
       })
 
       discovered.push(...discoveryResult.events)
       searched += discoveryResult.searched
+      warnings.push(...discoveryResult.warnings)
       completedPipelines += 1
     } catch (error) {
-      console.error('Erro na descoberta consolidada com Groq:', error)
+      console.error('Erro na descoberta com Brave:', error)
       warnings.push(
-        `Web: ${error instanceof Error ? error.message : 'falha inesperada na Groq'}`
+        `Web: ${error instanceof Error ? error.message : 'falha inesperada no Brave'}`
       )
     }
   }
