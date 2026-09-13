@@ -194,6 +194,81 @@ function domainOf(value: string) {
     return 'desconhecido'
   }
 }
+function decodeHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractMeta(html: string, key: string) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\function domainOf(value: string) {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return 'desconhecido'
+  }
+}
+')
+  const patterns = [
+    new RegExp(`<meta[^>]*(?:property|name)=["']${escaped}["'][^>]*content=["']([^"']+)["'][^>]*>`, 'i'),
+    new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']${escaped}["'][^>]*>`, 'i'),
+  ]
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    if (match?.[1]) return decodeHtml(match[1])
+  }
+
+  return ''
+}
+
+async function fetchExactPublicContext(value: string) {
+  try {
+    const response = await fetch(value, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'AondeTemBaileEventInspector/1.0',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    })
+
+    const contentType = response.headers.get('content-type') || ''
+    if (!response.ok || !contentType.includes('text/html')) {
+      return `Acesso HTTP direto: status ${response.status}; conteúdo não disponível como HTML público.`
+    }
+
+    const html = (await response.text()).slice(0, 500000)
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    const title = titleMatch?.[1] ? decodeHtml(titleMatch[1]) : ''
+    const ogTitle = extractMeta(html, 'og:title')
+    const ogDescription = extractMeta(html, 'og:description')
+    const ogUrl = extractMeta(html, 'og:url')
+    const visible = decodeHtml(html).slice(0, 12000)
+
+    return [
+      `URL final HTTP: ${response.url || value}`,
+      title ? `Título HTML: ${title}` : '',
+      ogTitle ? `og:title: ${ogTitle}` : '',
+      ogDescription ? `og:description: ${ogDescription}` : '',
+      ogUrl ? `og:url: ${ogUrl}` : '',
+      visible ? `Texto público visível: ${visible}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+  } catch (error) {
+    return `Acesso HTTP direto falhou: ${error instanceof Error ? error.message : 'erro inesperado'}`
+  }
+}
 
 const EVENT_SCHEMA = {
   type: 'object',
@@ -406,6 +481,8 @@ export async function inspectEventUrlWithGroq(
     throw new Error('A URL não corresponde à fonte selecionada ou ao formato de página de evento esperado.')
   }
 
+  const directContext = await fetchExactPublicContext(input.url)
+
   const research = await groqBrowserResearch([
     {
       role: 'system',
@@ -421,7 +498,12 @@ Contexto esperado: ${input.city}${input.state ? ` - ${input.state}` : ''}.
 Janela permitida: ${window.start} até ${window.end}.
 Fonte: ${input.source}.
 
-Tente localizar a página, sua versão canônica ou resultados públicos que comprovem o conteúdo dela.
+Foi feita também uma tentativa HTTP pública, sem login, cookies ou bypass:
+--- CONTEXTO HTTP DIRETO ---
+${directContext}
+--- FIM DO CONTEXTO HTTP ---
+
+Use browser search para corroborar ou localizar a página/versão canônica.
 Determine se representa UM evento específico.
 Informe no texto final o URL, título, data e horário COM ANO explícito, local, cidade/UF e evidências.
 Se a página estiver bloqueada, indisponível ou não houver dados suficientes, diga isso claramente.
