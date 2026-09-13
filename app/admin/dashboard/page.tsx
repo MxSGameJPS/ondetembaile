@@ -3,10 +3,23 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle } from 'lucide-react'
+import DiscoveredEventCard from '@/components/admin/DiscoveredEventCard'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle } from 'lucide-react'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
 import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
+import {
+  approveDiscoveryCandidateAction,
+  discoverEventsAction,
+  getDiscoveryCandidatesAction,
+  rejectDiscoveryCandidateAction,
+  updateDiscoveryCandidateAction,
+} from '@/app/actions/event-discovery'
+import type {
+  DiscoverySource,
+  EventDiscoveryCandidate,
+  UpdateDiscoveryCandidateInput,
+} from '@/types/event-discovery'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 
@@ -30,10 +43,19 @@ interface CategoryItem {
 }
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'all-events' | 'categories'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'discover' | 'users' | 'all-events' | 'categories'>('pending')
   const [events, setEvents] = useState<EventItem[]>([])
   const [profiles, setProfiles] = useState<ProfileItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [candidateEvents, setCandidateEvents] = useState<EventDiscoveryCandidate[]>([])
+  const [discoverCity, setDiscoverCity] = useState('')
+  const [discoverState, setDiscoverState] = useState('RS')
+  const [discoverPeriod, setDiscoverPeriod] = useState(30)
+  const [discoverSources, setDiscoverSources] = useState<DiscoverySource[]>(['web', 'reddit'])
+  const [discovering, setDiscovering] = useState(false)
+  const [candidateBusyId, setCandidateBusyId] = useState<string | null>(null)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [discoverySummary, setDiscoverySummary] = useState<string | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [creatingCategory, setCreatingCategory] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -53,7 +75,7 @@ export default function AdminDashboardPage() {
       // Check Admin Role
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, city')
         .eq('id', user.id)
         .single()
 
@@ -64,6 +86,7 @@ export default function AdminDashboardPage() {
       }
 
       setAdminRole(profile.role)
+      if (profile.city) setDiscoverCity(profile.city)
 
       // Fetch Events
       const { data: eventsData } = await supabase
@@ -87,11 +110,112 @@ export default function AdminDashboardPage() {
         setCategories(catRes.data)
       }
 
+      // Fetch pending candidates discovered from public sources
+      const candidateRes = await getDiscoveryCandidatesAction()
+      if (candidateRes.success) {
+        setCandidateEvents(candidateRes.candidates)
+      } else {
+        setDiscoveryError(candidateRes.error)
+      }
+
       setLoading(false)
     }
 
     loadAdminData()
   }, [])
+
+  const toggleDiscoverySource = (source: DiscoverySource) => {
+    setDiscoverSources((current) =>
+      current.includes(source)
+        ? current.filter((item) => item !== source)
+        : [...current, source]
+    )
+  }
+
+  const handleDiscoverEvents = async () => {
+    if (!discoverCity.trim()) {
+      setDiscoveryError('Informe uma cidade para iniciar a busca.')
+      return
+    }
+
+    if (discoverSources.length === 0) {
+      setDiscoveryError('Selecione ao menos uma fonte de busca.')
+      return
+    }
+
+    setDiscovering(true)
+    setDiscoveryError(null)
+    setDiscoverySummary(null)
+
+    const res = await discoverEventsAction({
+      city: discoverCity,
+      state: discoverState,
+      periodDays: discoverPeriod,
+      sources: discoverSources,
+    })
+
+    setDiscovering(false)
+
+    if (res.success) {
+      setCandidateEvents(res.candidates)
+      setDiscoverySummary(
+        `Brave analisou ${res.searched} resultado(s) e normalizou ${res.found} candidato(s). A fila abaixo mostra apenas itens ainda pendentes de revisão.`
+      )
+    } else {
+      setDiscoveryError(res.error)
+    }
+  }
+
+  const handleCandidateSave = async (
+    candidateId: string,
+    updates: UpdateDiscoveryCandidateInput
+  ) => {
+    setCandidateBusyId(candidateId)
+    const res = await updateDiscoveryCandidateAction(candidateId, updates)
+    setCandidateBusyId(null)
+
+    if (!res.success) {
+      alert(res.error || 'Erro ao salvar os ajustes do evento.')
+      return false
+    }
+
+    setCandidateEvents((current) =>
+      current.map((candidate) => (candidate.id === candidateId ? res.candidate : candidate))
+    )
+
+    return true
+  }
+
+  const handleCandidateApprove = async (candidateId: string) => {
+    setCandidateBusyId(candidateId)
+    const res = await approveDiscoveryCandidateAction(candidateId)
+    setCandidateBusyId(null)
+
+    if (!res.success) {
+      alert(res.error || 'Erro ao aprovar o evento encontrado.')
+      return
+    }
+
+    setCandidateEvents((current) => current.filter((candidate) => candidate.id !== candidateId))
+    setEvents((current) => [res.event as EventItem, ...current])
+    alert('Evento encontrado aprovado e publicado com sucesso!')
+  }
+
+  const handleCandidateReject = async (candidateId: string) => {
+    const reason = prompt('Motivo da recusa (opcional):')
+    if (reason === null) return
+
+    setCandidateBusyId(candidateId)
+    const res = await rejectDiscoveryCandidateAction(candidateId, reason)
+    setCandidateBusyId(null)
+
+    if (!res.success) {
+      alert(res.error || 'Erro ao recusar o evento encontrado.')
+      return
+    }
+
+    setCandidateEvents((current) => current.filter((candidate) => candidate.id !== candidateId))
+  }
 
   // Category Actions
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -223,6 +347,14 @@ export default function AdminDashboardPage() {
         </button>
 
         <button
+          className={`${styles.tabBtn} ${activeTab === 'discover' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('discover')}
+        >
+          <Search size={16} />
+          <span>Encontrar Eventos ({candidateEvents.length})</span>
+        </button>
+
+        <button
           className={`${styles.tabBtn} ${activeTab === 'categories' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('categories')}
         >
@@ -294,6 +426,134 @@ export default function AdminDashboardPage() {
               <p style={{ color: '#9ca3af', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                 Todos os eventos enviados foram revisados.
               </p>
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'discover' ? (
+        <div className={styles.discoverySection}>
+          <div className={styles.discoveryPanel}>
+            <div className={styles.discoveryPanelHeader}>
+              <div>
+                <div className={styles.discoveryEyebrow}>
+                  <Globe2 size={15} />
+                  <span>Descoberta via Brave Search</span>
+                </div>
+                <h2>Encontrar eventos em fontes públicas</h2>
+                <p>
+                  Busque Web e Reddit, revise os dados encontrados e publique somente o que for aprovado.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleDiscoverEvents}
+                disabled={discovering}
+              >
+                <Search size={18} />
+                <span>{discovering ? 'Buscando...' : 'Encontrar eventos'}</span>
+              </button>
+            </div>
+
+            <div className={styles.discoveryForm}>
+              <label>
+                <span>Cidade *</span>
+                <input
+                  value={discoverCity}
+                  placeholder="Ex: Porto Alegre"
+                  onChange={(event) => setDiscoverCity(event.target.value)}
+                  disabled={discovering}
+                />
+              </label>
+
+              <label>
+                <span>UF</span>
+                <input
+                  value={discoverState}
+                  maxLength={2}
+                  placeholder="RS"
+                  onChange={(event) => setDiscoverState(event.target.value.toUpperCase())}
+                  disabled={discovering}
+                />
+              </label>
+
+              <label>
+                <span>Período</span>
+                <select
+                  value={discoverPeriod}
+                  onChange={(event) => setDiscoverPeriod(Number(event.target.value))}
+                  disabled={discovering}
+                >
+                  <option value={14}>Próximos 14 dias</option>
+                  <option value={30}>Próximos 30 dias</option>
+                  <option value={60}>Próximos 60 dias</option>
+                  <option value={90}>Próximos 90 dias</option>
+                </select>
+              </label>
+            </div>
+
+            <div className={styles.sourceOptions}>
+              <span className={styles.sourceOptionsLabel}>Fontes:</span>
+
+              <label className={styles.sourceOption}>
+                <input
+                  type="checkbox"
+                  checked={discoverSources.includes('web')}
+                  onChange={() => toggleDiscoverySource('web')}
+                  disabled={discovering}
+                />
+                <Globe2 size={15} />
+                <span>Web pública</span>
+              </label>
+
+              <label className={styles.sourceOption}>
+                <input
+                  type="checkbox"
+                  checked={discoverSources.includes('reddit')}
+                  onChange={() => toggleDiscoverySource('reddit')}
+                  disabled={discovering}
+                />
+                <MessageCircle size={15} />
+                <span>Reddit</span>
+              </label>
+            </div>
+          </div>
+
+          {discoveryError && (
+            <div className={styles.discoveryError}>{discoveryError}</div>
+          )}
+
+          {discoverySummary && (
+            <div className={styles.discoverySummary}>{discoverySummary}</div>
+          )}
+
+          <div className={styles.discoveryResultsHeader}>
+            <div>
+              <h3>Fila de revisão</h3>
+              <p>
+                {candidateEvents.length} evento(s) aguardando decisão. Resultados recusados não voltam nas próximas buscas.
+              </p>
+            </div>
+          </div>
+
+          {candidateEvents.length > 0 ? (
+            <div className={styles.discoveryGrid}>
+              {candidateEvents.map((candidate) => (
+                <DiscoveredEventCard
+                  key={candidate.id}
+                  candidate={candidate}
+                  busy={candidateBusyId === candidate.id}
+                  onSave={handleCandidateSave}
+                  onApprove={handleCandidateApprove}
+                  onReject={handleCandidateReject}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.discoveryEmpty}>
+              <Search size={34} />
+              <h3>Nenhum evento encontrado aguardando revisão</h3>
+              <p>Escolha cidade, período e fontes e clique em “Encontrar eventos”.</p>
             </div>
           )}
         </div>

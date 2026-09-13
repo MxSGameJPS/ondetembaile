@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, MapPin, Ticket, MessageCircle, ArrowRight } from 'lucide-react'
+import { Calendar, MapPin, Ticket, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import styles from './EventCard.module.css'
 
 export interface EventItem {
@@ -17,7 +17,10 @@ export interface EventItem {
   image_url: string
   event_date: string
   ticket_price: string
-  whatsapp_info: string
+  whatsapp_info?: string | null
+  source_url?: string | null
+  source_domain?: string | null
+  origin?: 'producer' | 'admin' | 'discovered'
   status?: string
   rejection_reason?: string | null
 }
@@ -37,9 +40,11 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
     minute: '2-digit',
   })
 
-  // Format WhatsApp number link
-  const cleanWhatsapp = event.whatsapp_info.replace(/\D/g, '')
-  const whatsappUrl = `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Vi o evento "${event.title}" no Aonde Tem Baile e gostaria de mais informações.`)}`
+  // Format WhatsApp number link when a contact number is available.
+  const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
+  const whatsappUrl = cleanWhatsapp
+    ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Vi o evento "${event.title}" no Aonde Tem Baile e gostaria de mais informações.`)}`
+    : null
 
   return (
     <div className={styles.card}>
@@ -126,15 +131,29 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
         ) : (
           /* Footer Actions */
           <div className={styles.footer}>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.whatsappBtn}
-            >
-              <MessageCircle size={14} />
-              <span>WhatsApp</span>
-            </a>
+            {whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.whatsappBtn}
+              >
+                <MessageCircle size={14} />
+                <span>WhatsApp</span>
+              </a>
+            ) : event.source_url ? (
+              <a
+                href={event.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.whatsappBtn}
+              >
+                <ExternalLink size={14} />
+                <span>Fonte</span>
+              </a>
+            ) : (
+              <span />
+            )}
 
             <Link href={`/evento/${event.id}`} className={styles.detailsBtn}>
               <span>Ver Evento</span>
