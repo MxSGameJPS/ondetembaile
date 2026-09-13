@@ -29,8 +29,6 @@ export async function searchBraveWeb(query: string, count = 15): Promise<BraveWe
   const params = new URLSearchParams({
     q: query,
     country: 'BR',
-    search_lang: 'pt-br',
-    ui_lang: 'pt-BR',
     count: String(Math.min(Math.max(count, 1), 20)),
     safesearch: 'moderate',
     extra_snippets: 'true',
