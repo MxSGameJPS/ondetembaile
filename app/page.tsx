@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCategoriesAction } from '@/app/actions/categories'
 import EventCard, { EventItem } from '@/components/EventCard'
@@ -71,6 +71,11 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isMouseDown = useRef(false)
+  const startX = useRef(0)
+  const scrollLeftPos = useRef(0)
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -100,6 +105,49 @@ export default function HomePage() {
 
     loadData()
   }, [])
+
+  // Desktop Scroll Handlers
+  const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current && e.deltaY !== 0) {
+      scrollContainerRef.current.scrollLeft += e.deltaY * 0.8
+    }
+  }
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    isMouseDown.current = true
+    if (scrollContainerRef.current) {
+      startX.current = e.pageX - scrollContainerRef.current.offsetLeft
+      scrollLeftPos.current = scrollContainerRef.current.scrollLeft
+    }
+  }
+
+  const handleMouseLeave = () => {
+    isMouseDown.current = false
+  }
+
+  const handleMouseUp = () => {
+    isMouseDown.current = false
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown.current || !scrollContainerRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - startX.current) * 1.5
+    scrollContainerRef.current.scrollLeft = scrollLeftPos.current - walk
+  }
+
+  const scrollToResults = () => {
+    const el = document.getElementById('eventos-feed')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  const handleCategoryClick = (catId: string) => {
+    setSelectedCategory(catId)
+    scrollToResults()
+  }
 
   // Filter events by City search, Category & Period
   const filteredEvents = events.filter((e) => {
@@ -137,12 +185,13 @@ export default function HomePage() {
         {/* Layer 0: Background image with subtle cinematic zoom */}
         <div className={styles.heroBgImage} />
 
-        {/* Layer 1: Ambient nightclub lights — blinking (marca: laranja) */}
+        {/* Layer 1: Ambient nightclub lights — real animated nightclub lights */}
         <div className={styles.clubLights} aria-hidden="true">
           <span className={`${styles.clubLight} ${styles.clubLightA}`} />
           <span className={`${styles.clubLight} ${styles.clubLightB}`} />
           <span className={`${styles.clubLight} ${styles.clubLightC}`} />
           <span className={`${styles.clubLight} ${styles.clubLightD}`} />
+          <span className={`${styles.clubLight} ${styles.clubLightE}`} />
         </div>
 
         {/* Layer 2: Legibility overlay + vignette */}
@@ -166,6 +215,9 @@ export default function HomePage() {
                 placeholder="Buscar por Cidade (ex: Porto Alegre)..."
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') scrollToResults()
+                }}
                 className={styles.searchInput}
               />
             </div>
@@ -175,7 +227,10 @@ export default function HomePage() {
               <Tag size={18} color="#F26A00" />
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value)
+                  scrollToResults()
+                }}
                 className={styles.searchSelect}
               >
                 <option value="all">Todas as Categorias</option>
@@ -188,7 +243,11 @@ export default function HomePage() {
             </div>
 
             {/* Search Button */}
-            <button className="btn-primary" style={{ padding: '0.75rem 1.4rem', borderRadius: '12px' }}>
+            <button
+              onClick={scrollToResults}
+              className="btn-primary"
+              style={{ padding: '0.75rem 1.4rem', borderRadius: '12px' }}
+            >
               <Search size={18} />
               <span>Encontrar eventos</span>
             </button>
@@ -197,7 +256,7 @@ export default function HomePage() {
       </section>
 
       {/* Events Feed Section */}
-      <section style={{ padding: '3rem 1.5rem' }}>
+      <section id="eventos-feed" style={{ padding: '3.5rem 1.5rem', scrollMarginTop: '2rem' }}>
         <div className="container">
           
           {/* Header & Filter options */}
@@ -243,26 +302,34 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Category Filter Pills Bar */}
+          {/* Category Filter Pills Bar with Drag/Wheel Scroll (hidden scrollbar, no arrows) */}
           {categories.length > 0 && (
-            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1.75rem', scrollbarWidth: 'none' }}>
-              <button
-                className={`${styles.filterBtn} ${selectedCategory === 'all' ? styles.filterBtnActive : ''}`}
-                onClick={() => setSelectedCategory('all')}
-                style={{ whiteSpace: 'nowrap' }}
+            <div className={styles.categoryFilterWrapper}>
+              <div
+                ref={scrollContainerRef}
+                className={styles.categoriesScrollContainer}
+                onWheel={handleWheelScroll}
+                onMouseDown={handleMouseDown}
+                onMouseLeave={handleMouseLeave}
+                onMouseUp={handleMouseUp}
+                onMouseMove={handleMouseMove}
               >
-                Todas as Categorias
-              </button>
-              {categories.map((cat) => (
                 <button
-                  key={cat.id}
-                  className={`${styles.filterBtn} ${selectedCategory === cat.id ? styles.filterBtnActive : ''}`}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  style={{ whiteSpace: 'nowrap' }}
+                  className={`${styles.filterBtn} ${selectedCategory === 'all' ? styles.filterBtnActive : ''}`}
+                  onClick={() => handleCategoryClick('all')}
                 >
-                  {cat.name}
+                  Todas as Categorias
                 </button>
-              ))}
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    className={`${styles.filterBtn} ${selectedCategory === cat.id ? styles.filterBtnActive : ''}`}
+                    onClick={() => handleCategoryClick(cat.id)}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
