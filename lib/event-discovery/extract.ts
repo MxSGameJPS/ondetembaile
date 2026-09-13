@@ -433,9 +433,13 @@ export async function normalizeBraveResult(
     pageDescription ||
     decodeHtml([result.description, ...(result.extra_snippets ?? [])].filter(Boolean).join(' '))
 
-  const structuredDate =
+  const structuredDateCandidate =
     typeof jsonLdEvent?.startDate === 'string' && !Number.isNaN(new Date(jsonLdEvent.startDate).getTime())
       ? new Date(jsonLdEvent.startDate).toISOString()
+      : null
+  const structuredDate =
+    structuredDateCandidate && isReasonableFutureDate(structuredDateCandidate, context.periodDays)
+      ? structuredDateCandidate
       : null
 
   const eventDate = structuredDate ?? parseDateFromText(braveText, context.periodDays)
