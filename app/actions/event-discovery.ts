@@ -261,12 +261,29 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
     }
   }
 
+  let categoryId: string | null = null
+  let categoryName: string | null = candidate.category_name || null
+
+  if (candidate.category_name) {
+    const safeCategorySearch = candidate.category_name.replace(/[%_]/g, '')
+    const { data: matchingCategories } = await auth.supabase
+      .from('categories')
+      .select('id, name')
+      .ilike('name', `%${safeCategorySearch}%`)
+      .limit(1)
+
+    if (matchingCategories?.[0]) {
+      categoryId = matchingCategories[0].id
+      categoryName = matchingCategories[0].name
+    }
+  }
+
   const { data: createdEvent, error: insertError } = await auth.supabase
     .from('events')
     .insert({
       producer_id: auth.user.id,
-      category_id: null,
-      category_name: candidate.category_name || null,
+      category_id: categoryId,
+      category_name: categoryName,
       title: candidate.title,
       description: candidate.description || 'Evento encontrado em fonte pública e revisado pela administração.',
       location_name: candidate.location_name || null,
