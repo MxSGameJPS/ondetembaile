@@ -170,6 +170,7 @@ export default function HomePage() {
                 Exibindo {filteredEvents.length} baile(s) cadastrado(s)
               </p>
             </div>
+          </div>
 
           {/* Category Filter Pills Bar */}
           {categories.length > 0 && (
