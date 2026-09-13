@@ -239,13 +239,13 @@ async function fetchExactPublicContext(value: string) {
       return `Acesso HTTP direto: status ${response.status}; conteúdo não disponível como HTML público.`
     }
 
-    const html = (await response.text()).slice(0, 500000)
+    const html = (await response.text()).slice(0, 120000)
     const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
     const title = titleMatch?.[1] ? decodeHtml(titleMatch[1]) : ''
     const ogTitle = extractMeta(html, 'og:title')
     const ogDescription = extractMeta(html, 'og:description')
     const ogUrl = extractMeta(html, 'og:url')
-    const visible = decodeHtml(html).slice(0, 12000)
+    const visible = decodeHtml(html).slice(0, 1400)
 
     return [
       `URL final HTTP: ${response.url || value}`,
@@ -620,7 +620,7 @@ function compoundEvents(value: unknown) {
   if (!Array.isArray(events)) return [] as StructuredEvent[]
 
   return events
-    .slice(0, 18)
+    .slice(0, 10)
     .map(normalizeCompoundEvent)
     .filter((event): event is StructuredEvent => Boolean(event))
 }
@@ -681,7 +681,7 @@ export async function discoverEventsWithGroq(input: GroqConsolidatedDiscoveryInp
   const prompt = [
     'Você é o motor de descoberta do Aonde Tem Baile.',
     '',
-    'Faça UMA pesquisa web ampla e atual para encontrar no máximo 16 eventos presenciais futuros em ' +
+    'Faça UMA pesquisa web atual para encontrar no máximo 8 eventos presenciais futuros em ' +
       input.city +
       (input.state ? ' - ' + input.state : '') +
       '.',
@@ -706,9 +706,19 @@ export async function discoverEventsWithGroq(input: GroqConsolidatedDiscoveryInp
     compoundJsonShape(),
   ].join('\n')
 
+  const compactPrompt = [
+    'Encontre até 6 eventos presenciais em ' + input.city + (input.state ? ' - ' + input.state : '') + '.',
+    'Período: ' + window.start + ' a ' + window.end + '.',
+    'Fontes permitidas: ' + sources.join(', ') + '.',
+    'Somente evento único com URL real, ano e horário explícitos. Exclua guias, agendas, listas e eventos passados.',
+    'Sympla: apenas /evento/. Rolê Agora: apenas /event/.',
+    compoundJsonShape(),
+  ].join('\n')
+
   const response = await groqCompoundJson<StructuredEventsResponse>(prompt, {
     enabledTools: ['web_search'],
-    maxCompletionTokens: 4500,
+    maxCompletionTokens: 2200,
+    fallbackPrompt: compactPrompt,
   })
 
   const rawEvents = compoundEvents(response)
@@ -743,7 +753,7 @@ export async function inspectEventUrlWithGroqCompound(input: GroqCompoundUrlInpu
     throw new Error('A URL não corresponde à fonte selecionada ou ao formato esperado.')
   }
 
-  const directContext = (await fetchExactPublicContext(input.url)).slice(0, 6500)
+  const directContext = (await fetchExactPublicContext(input.url)).slice(0, 1800)
 
   const prompt = [
     'Você está validando uma URL pública informada manualmente para o Aonde Tem Baile.',
@@ -769,9 +779,19 @@ export async function inspectEventUrlWithGroqCompound(input: GroqCompoundUrlInpu
     compoundJsonShape(),
   ].join('\n')
 
+  const compactPrompt = [
+    'Valide esta URL de evento: ' + input.url,
+    'Fonte: ' + input.source + '. Cidade: ' + input.city + (input.state ? ' - ' + input.state : '') + '.',
+    'Período: ' + window.start + ' a ' + window.end + '.',
+    'Retorne events vazio se não houver prova pública de UM evento futuro com ano e horário explícitos.',
+    'Use a URL informada em source_url.',
+    compoundJsonShape(),
+  ].join('\n')
+
   const response = await groqCompoundJson<StructuredEventsResponse>(prompt, {
-    enabledTools: ['web_search', 'visit_website'],
-    maxCompletionTokens: 2200,
+    enabledTools: ['web_search'],
+    maxCompletionTokens: 1200,
+    fallbackPrompt: compactPrompt,
   })
 
   for (const event of compoundEvents(response)) {

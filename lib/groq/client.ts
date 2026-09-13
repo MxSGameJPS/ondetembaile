@@ -20,6 +20,7 @@ type GroqMessage = {
 interface CompoundJsonOptions {
   enabledTools?: Array<'web_search' | 'visit_website'>
   maxCompletionTokens?: number
+  fallbackPrompt?: string
 }
 
 function getGroqApiKey() {
@@ -39,6 +40,10 @@ function friendlyGroqError(status: number, message: string, retryAfter: string |
         : ' Aguarde alguns segundos e tente novamente.'
 
     return new Error(`A Groq atingiu o limite temporário de uso.${waitText}`)
+  }
+
+  if (status === 413) {
+    return new Error('A Groq recusou um payload muito grande. A aplicação tentou reduzir o contexto, mas a solicitação ainda ficou acima do limite.')
   }
 
   if (status === 401 || status === 403) {
@@ -103,12 +108,12 @@ export async function groqCompoundJson<T>(
   prompt: string,
   options: CompoundJsonOptions = {}
 ): Promise<T> {
-  const content = await callGroq({
+  const buildBody = (content: string, maxCompletionTokens: number) => ({
     model: GROQ_DISCOVERY_MODEL,
     messages: [
       {
         role: 'user',
-        content: prompt,
+        content,
       },
     ],
     compound_custom: {
@@ -120,8 +125,29 @@ export async function groqCompoundJson<T>(
       type: 'json_object',
     },
     temperature: 0.1,
-    max_completion_tokens: options.maxCompletionTokens ?? 4500,
+    max_completion_tokens: maxCompletionTokens,
   })
+
+  const primaryPrompt = prompt.slice(0, 6000)
+  let content: string
+
+  try {
+    content = await callGroq(
+      buildBody(primaryPrompt, Math.min(options.maxCompletionTokens ?? 3000, 3000))
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+
+    if (!message.includes('payload muito grande')) {
+      throw error
+    }
+
+    const fallbackPrompt = (options.fallbackPrompt || prompt).slice(0, 2200)
+    content = await callGroq(
+      buildBody(fallbackPrompt, Math.min(options.maxCompletionTokens ?? 1200, 1200)),
+      false
+    )
+  }
 
   try {
     return JSON.parse(content) as T
