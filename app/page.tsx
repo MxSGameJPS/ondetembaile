@@ -132,9 +132,14 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Hero Section */}
+      {/* Hero Section with Cinematic Background & Party Light Effects */}
       <section className={styles.hero}>
-        <div className="container">
+        <div className={styles.heroBgImage} />
+        <div className={styles.heroOverlay} />
+        <div className={styles.partyStrobeLayer} />
+
+        <div className={`container ${styles.heroContent}`}>
+          
 
           <h1 className={styles.heroTitle}>
             Descubra o que está <span className="gradient-text">rolando perto de você.</span>
