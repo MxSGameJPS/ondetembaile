@@ -3,7 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/admin'
 import { searchBraveWeb } from '@/lib/brave/client'
-import { normalizeBraveResult, normalizeSourceUrl } from '@/lib/event-discovery/extract'
+import {
+  normalizeBraveResult,
+  normalizeSourceUrl,
+  type NormalizedDiscoveredEvent,
+} from '@/lib/event-discovery/extract'
 import type {
   DiscoverEventsInput,
   DiscoverySource,
@@ -134,7 +138,9 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
           )
         )
       )
-    ).filter(Boolean)
+    ).filter(
+      (candidate): candidate is NormalizedDiscoveredEvent => candidate !== null
+    )
 
     if (normalized.length > 0) {
       const { error: insertError } = await auth.supabase
