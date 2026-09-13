@@ -707,7 +707,7 @@ export async function updateDiscoveryCandidateAction(
       updates.ticket_price !== undefined ? cleanText(updates.ticket_price, 80) || null : undefined,
     whatsapp_info:
       updates.whatsapp_info !== undefined
-        ? updates.whatsapp_info.replace(/\D/g, '').slice(0, 13) || null
+        ? cleanText(updates.whatsapp_info, 40).replace(/\D/g, '').slice(0, 13) || null
         : undefined,
     raw_data: rawData,
     updated_at: new Date().toISOString(),
