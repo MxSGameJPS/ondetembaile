@@ -2,17 +2,18 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth/admin'
-import { searchBraveWeb, type BraveWebResult } from '@/lib/brave/client'
 import {
-  normalizeBraveResult,
-  normalizeSourceUrl,
-  type NormalizedDiscoveredEvent,
-} from '@/lib/event-discovery/extract'
+  discoverSourceWithGroq,
+  getDiscoveryWindow,
+  inspectEventUrlWithGroq,
+  type GroqEventCandidate,
+} from '@/lib/event-discovery/groq'
 import type {
   DiscoverEventsInput,
   DiscoverySource,
   EventDiscoveryCandidate,
   ImportFacebookEventInput,
+  ImportRoleAgoraEventInput,
   ImportSymplaEventInput,
   UpdateDiscoveryCandidateInput,
 } from '@/types/event-discovery'
@@ -23,39 +24,8 @@ function cleanText(value: string | undefined | null, maxLength: number) {
 }
 
 function normalizePeriodDays(value: number) {
-  if (![14, 30, 60, 90].includes(value)) return 30
+  if (![30, 60, 90].includes(value)) return 30
   return value
-}
-
-function buildPeriodLabel(days: number) {
-  const start = new Date()
-  const end = new Date(Date.now() + days * 86400000)
-  const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
-
-  const startLabel = formatter.format(start)
-  const endLabel = formatter.format(end)
-
-  return startLabel === endLabel ? startLabel : `${startLabel} ${endLabel}`
-}
-
-function buildSearchQuery(source: DiscoverySource, city: string, state: string, periodDays: number) {
-  const location = `"${city}"${state ? ` "${state}"` : ''}`
-  const period = buildPeriodLabel(periodDays)
-  const terms = '("baile" OR "festa" OR "show" OR "festival" OR "evento" OR "forró" OR "sertanejo")'
-
-  if (source === 'reddit') {
-    return `site:reddit.com ${terms} ${location} ${period}`
-  }
-
-  if (source === 'facebook') {
-    return `site:facebook.com ${terms} ${location} ${period}`
-  }
-
-  if (source === 'sympla') {
-    return `site:sympla.com.br/evento ${terms} ${location} ${period}`
-  }
-
-  return `${terms} ${location} ${period}`
 }
 
 function databaseSetupMessage(error?: { code?: string; message?: string } | null) {
@@ -72,118 +42,18 @@ function databaseSetupMessage(error?: { code?: string; message?: string } | null
   return error?.message || 'Erro ao acessar a fila de eventos encontrados.'
 }
 
-function normalizeFacebookUrl(value: string) {
-  try {
-    const normalized = normalizeSourceUrl(value)
-    if (!normalized) return null
-
-    const url = new URL(normalized)
-    const hostname = url.hostname.toLowerCase()
-
-    const isFacebook =
-      hostname === 'facebook.com' ||
-      hostname.endsWith('.facebook.com') ||
-      hostname === 'fb.com' ||
-      hostname.endsWith('.fb.com')
-
-    if (!isFacebook) return null
-
-    return normalized
-  } catch {
-    return null
-  }
+function hasGroqKey() {
+  return Boolean(process.env.API_GROQ_KEY || process.env.GROQ_API_KEY)
 }
 
-function facebookLookupTerm(value: string) {
+function normalizeSourceUrl(value: string) {
   try {
     const url = new URL(value)
-    const segments = url.pathname.split('/').filter(Boolean)
-    const eventsIndex = segments.findIndex((segment) => segment.toLowerCase() === 'events')
-
-    if (eventsIndex >= 0 && segments[eventsIndex + 1]) {
-      return segments[eventsIndex + 1]
-    }
-
-    return segments.slice(-2).join(' ') || url.hostname
+    url.hash = ''
+    return url.toString()
   } catch {
     return value
   }
-}
-
-function facebookResultScore(result: BraveWebResult, normalizedUrl: string, lookupTerm: string) {
-  const resultUrl = normalizeSourceUrl(result.url || '')
-  let score = 0
-
-  if (resultUrl === normalizedUrl) score += 100
-  if (lookupTerm && resultUrl.includes(lookupTerm)) score += 50
-  if (/\/events(?:\/|$)/i.test(resultUrl)) score += 20
-  if ((result.description || '').toLowerCase().includes('evento')) score += 5
-
-  return score
-}
-
-function normalizeSymplaUrl(value: string) {
-  try {
-    const normalized = normalizeSourceUrl(value)
-    if (!normalized) return null
-
-    const url = new URL(normalized)
-    const hostname = url.hostname.toLowerCase()
-    const isSympla = hostname === 'sympla.com.br' || hostname.endsWith('.sympla.com.br')
-
-    if (!isSympla || !/\/evento(?:\/|$)/i.test(url.pathname)) return null
-
-    return normalized
-  } catch {
-    return null
-  }
-}
-
-function symplaLookupParts(value: string) {
-  try {
-    const url = new URL(value)
-    const segments = url.pathname.split('/').filter(Boolean)
-    const numericId = [...segments].reverse().find((segment) => /^\d{4,}$/.test(segment)) || ''
-    const slug =
-      [...segments].reverse().find((segment) => segment !== numericId && segment.toLowerCase() !== 'evento') ||
-      ''
-
-    return {
-      numericId,
-      slugText: slug.replace(/[-_]+/g, ' ').trim(),
-    }
-  } catch {
-    return { numericId: '', slugText: '' }
-  }
-}
-
-function symplaResultScore(
-  result: BraveWebResult,
-  normalizedUrl: string,
-  numericId: string,
-  slugText: string
-) {
-  const resultUrl = normalizeSourceUrl(result.url || '')
-  let score = 0
-
-  if (resultUrl === normalizedUrl) score += 100
-  if (numericId && resultUrl.includes(numericId)) score += 70
-  if (/\/evento(?:\/|$)/i.test(resultUrl)) score += 20
-
-  const haystack = `${result.title || ''} ${result.description || ''}`.toLowerCase()
-  if (slugText) {
-    const words = slugText.toLowerCase().split(/\s+/).filter((word) => word.length >= 4)
-    const matches = words.filter((word) => haystack.includes(word)).length
-    score += Math.min(matches * 4, 20)
-  }
-
-  return score
-}
-
-function hasExplicitYearInCandidateSource(candidate: EventDiscoveryCandidate) {
-  return /\b(?:19|20)\d{2}\b/.test(
-    `${candidate.source_title || ''} ${candidate.source_snippet || ''}`
-  )
 }
 
 function candidateDateMetadata(candidate: EventDiscoveryCandidate) {
@@ -197,28 +67,86 @@ function candidateDateMetadata(candidate: EventDiscoveryCandidate) {
       : {}
 
   return {
-    rawData,
+    engine:
+      'discovery_engine' in rawData && typeof rawData.discovery_engine === 'string'
+        ? rawData.discovery_engine
+        : '',
     manuallyConfirmed: date.manual_confirmed === true,
-    sourceExplicitYear: date.source_explicit_year === true,
   }
 }
 
 function sanitizeCandidateForReview(candidate: EventDiscoveryCandidate) {
-  if (candidate.source_type !== 'sympla' || !candidate.event_date) return candidate
+  if (!candidate.event_date) return candidate
+
+  const eventTime = new Date(candidate.event_date).getTime()
+  if (!Number.isNaN(eventTime) && eventTime < Date.now() - 6 * 60 * 60 * 1000) {
+    return { ...candidate, event_date: null, confidence: Math.min(candidate.confidence, 35) }
+  }
 
   const metadata = candidateDateMetadata(candidate)
-  const trustedDate =
-    metadata.manuallyConfirmed ||
-    metadata.sourceExplicitYear ||
-    hasExplicitYearInCandidateSource(candidate)
-
-  if (trustedDate) return candidate
-
-  return {
-    ...candidate,
-    event_date: null,
-    confidence: Math.min(candidate.confidence, 55),
+  if (
+    candidate.source_type === 'sympla' &&
+    metadata.engine !== 'groq' &&
+    !metadata.manuallyConfirmed
+  ) {
+    const sourceText = `${candidate.source_title || ''} ${candidate.source_snippet || ''}`
+    if (!/\b(?:19|20)\d{2}\b/.test(sourceText)) {
+      return { ...candidate, event_date: null, confidence: Math.min(candidate.confidence, 45) }
+    }
   }
+
+  return candidate
+}
+
+function isLegacyListing(candidate: EventDiscoveryCandidate) {
+  const text = `${candidate.title} ${candidate.source_title || ''} ${candidate.source_snippet || ''}`
+  if (
+    /\b(o que fazer|guia|agenda|calend[aá]rio|programa[cç][aã]o|eventos em|melhores eventos|pr[oó]ximos eventos)\b/i.test(
+      text
+    )
+  ) {
+    return true
+  }
+
+  try {
+    const url = new URL(candidate.source_url)
+    const host = url.hostname.replace(/^www\./, '').toLowerCase()
+    const path = url.pathname.toLowerCase()
+
+    if ((host === 'roleagora.com.br' || host.endsWith('.roleagora.com.br')) && !path.startsWith('/event/')) {
+      return true
+    }
+
+    if ((host === 'sympla.com.br' || host.endsWith('.sympla.com.br')) && !path.startsWith('/evento/')) {
+      return true
+    }
+  } catch {
+    return true
+  }
+
+  return false
+}
+
+function prepareCandidates(candidates: EventDiscoveryCandidate[]) {
+  return candidates
+    .filter((candidate) => !isLegacyListing(candidate))
+    .map(sanitizeCandidateForReview)
+}
+
+async function upsertCandidates(
+  supabase: Awaited<ReturnType<typeof requireAdmin>> extends { supabase: infer T } ? T : never,
+  candidates: GroqEventCandidate[]
+) {
+  if (candidates.length === 0) return null
+
+  const { error } = await (supabase as any)
+    .from('event_candidates')
+    .upsert(candidates, {
+      onConflict: 'source_url',
+      ignoreDuplicates: false,
+    })
+
+  return error
 }
 
 export async function getDiscoveryCandidatesAction() {
@@ -231,7 +159,7 @@ export async function getDiscoveryCandidatesAction() {
     .eq('status', 'pending')
     .order('confidence', { ascending: false })
     .order('found_at', { ascending: false })
-    .limit(60)
+    .limit(80)
 
   if (error) {
     return { success: false as const, error: databaseSetupMessage(error) }
@@ -239,7 +167,7 @@ export async function getDiscoveryCandidatesAction() {
 
   return {
     success: true as const,
-    candidates: ((data ?? []) as EventDiscoveryCandidate[]).map(sanitizeCandidateForReview),
+    candidates: prepareCandidates((data ?? []) as EventDiscoveryCandidate[]),
   }
 }
 
@@ -247,10 +175,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
 
-  if (!process.env.BRAVE_API_KEY) {
+  if (!hasGroqKey()) {
     return {
       success: false as const,
-      error: 'BRAVE_API_KEY não está configurada no ambiente do servidor.',
+      error: 'API_GROQ_KEY não está configurada no ambiente do servidor.',
     }
   }
 
@@ -262,7 +190,8 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
       source === 'web' ||
       source === 'reddit' ||
       source === 'facebook' ||
-      source === 'sympla'
+      source === 'sympla' ||
+      source === 'roleagora'
   )
 
   if (!city) {
@@ -273,211 +202,129 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     return { success: false as const, error: 'Selecione ao menos uma fonte de busca.' }
   }
 
-  try {
-    const sourceResults = await Promise.all(
-      sources.map(async (source) => {
-        const query = buildSearchQuery(source, city, state, periodDays)
-        const results = await searchBraveWeb(
-          query,
-          source === 'reddit'
-            ? 12
-            : source === 'facebook'
-              ? 14
-              : source === 'sympla'
-                ? 16
-                : 18
-        )
-        return results.map((result) => ({ result, source }))
+  const discovered: GroqEventCandidate[] = []
+  const warnings: string[] = []
+  let searched = 0
+
+  for (const source of sources) {
+    try {
+      const result = await discoverSourceWithGroq({
+        city,
+        state: state || undefined,
+        periodDays,
+        source,
       })
-    )
 
-    const uniqueResults: Array<{ result: BraveWebResult; source: DiscoverySource }> = []
-    const seen = new Set<string>()
-
-    for (const item of sourceResults.flat()) {
-      const normalizedUrl = normalizeSourceUrl(item.result.url || '')
-      if (!normalizedUrl || seen.has(normalizedUrl)) continue
-      seen.add(normalizedUrl)
-      uniqueResults.push(item)
-    }
-
-    const normalized = (
-      await Promise.all(
-        uniqueResults.map((item, index) =>
-          normalizeBraveResult(
-            item.result,
-            {
-              city,
-              state: state || undefined,
-              periodDays,
-              sourceType: item.source,
-            },
-            index < 10
-          )
-        )
+      discovered.push(...result.events)
+      searched += result.searched
+    } catch (error) {
+      console.error(`Erro na descoberta Groq para ${source}:`, error)
+      warnings.push(
+        `${source}: ${error instanceof Error ? error.message : 'falha inesperada'}`
       )
-    ).filter(
-      (candidate): candidate is NormalizedDiscoveredEvent => candidate !== null
-    )
-
-    if (normalized.length > 0) {
-      const { error: insertError } = await auth.supabase
-        .from('event_candidates')
-        .upsert(normalized, {
-          onConflict: 'source_url',
-          ignoreDuplicates: true,
-        })
-
-      if (insertError) {
-        return { success: false as const, error: databaseSetupMessage(insertError) }
-      }
     }
+  }
 
-    let candidatesQuery = auth.supabase
-      .from('event_candidates')
-      .select('*')
-      .eq('status', 'pending')
-      .ilike('city', `%${city}%`)
-      .order('confidence', { ascending: false })
-      .order('found_at', { ascending: false })
-      .limit(60)
+  const unique = new Map<string, GroqEventCandidate>()
+  for (const candidate of discovered) {
+    unique.set(normalizeSourceUrl(candidate.source_url), candidate)
+  }
+  const candidatesToSave = Array.from(unique.values())
 
-    if (state) {
-      candidatesQuery = candidatesQuery.ilike('state', `%${state}%`)
-    }
+  const insertError = await upsertCandidates(auth.supabase as any, candidatesToSave)
+  if (insertError) {
+    return { success: false as const, error: databaseSetupMessage(insertError) }
+  }
 
-    const { data: candidates, error: candidatesError } = await candidatesQuery
+  const window = getDiscoveryWindow(periodDays)
+  const startIso = `${window.start}T00:00:00-03:00`
+  const endIso = `${window.end}T23:59:59-03:00`
 
-    if (candidatesError) {
-      return { success: false as const, error: databaseSetupMessage(candidatesError) }
-    }
+  let candidatesQuery = auth.supabase
+    .from('event_candidates')
+    .select('*')
+    .eq('status', 'pending')
+    .ilike('city', `%${city}%`)
+    .gte('event_date', startIso)
+    .lte('event_date', endIso)
+    .order('event_date', { ascending: true })
+    .limit(80)
 
-    return {
-      success: true as const,
-      candidates: ((candidates ?? []) as EventDiscoveryCandidate[]).map(
-        sanitizeCandidateForReview
-      ),
-      found: normalized.length,
-      searched: uniqueResults.length,
-    }
-  } catch (error) {
-    console.error('Erro ao descobrir eventos:', error)
+  if (state) {
+    candidatesQuery = candidatesQuery.ilike('state', `%${state}%`)
+  }
+
+  const { data: candidates, error: candidatesError } = await candidatesQuery
+
+  if (candidatesError) {
+    return { success: false as const, error: databaseSetupMessage(candidatesError) }
+  }
+
+  if (candidatesToSave.length === 0 && warnings.length === sources.length) {
     return {
       success: false as const,
-      error: error instanceof Error ? error.message : 'Erro inesperado ao consultar fontes públicas.',
+      error: `Nenhuma fonte conseguiu concluir a busca com Groq. ${warnings.join(' | ')}`,
     }
+  }
+
+  return {
+    success: true as const,
+    candidates: prepareCandidates((candidates ?? []) as EventDiscoveryCandidate[]),
+    found: candidatesToSave.length,
+    searched,
+    warnings,
+    window,
   }
 }
 
-export async function importFacebookEventAction(input: ImportFacebookEventInput) {
+async function importUrlWithGroq(
+  source: 'facebook' | 'sympla' | 'roleagora',
+  input: ImportFacebookEventInput | ImportSymplaEventInput | ImportRoleAgoraEventInput
+) {
   const auth = await requireAdmin()
   if (!auth.ok) return { success: false as const, error: auth.error }
 
-  if (!process.env.BRAVE_API_KEY) {
+  if (!hasGroqKey()) {
     return {
       success: false as const,
-      error: 'BRAVE_API_KEY não está configurada no ambiente do servidor.',
+      error: 'API_GROQ_KEY não está configurada no ambiente do servidor.',
     }
   }
 
-  const normalizedUrl = normalizeFacebookUrl(cleanText(input.url, 1500))
+  const url = cleanText(input.url, 1500)
   const city = cleanText(input.city, 100)
   const state = cleanText(input.state, 30).toUpperCase()
   const periodDays = normalizePeriodDays(Number(input.periodDays))
 
-  if (!normalizedUrl) {
-    return {
-      success: false as const,
-      error: 'Informe uma URL válida do Facebook.',
-    }
+  if (!url) {
+    return { success: false as const, error: 'Informe uma URL para importar.' }
   }
 
   if (!city) {
     return {
       success: false as const,
-      error: 'Informe a cidade para ajudar a interpretar o evento.',
+      error: 'Informe a cidade para validar o evento dentro da janela escolhida.',
     }
   }
 
   try {
-    const lookupTerm = facebookLookupTerm(normalizedUrl)
-    const queries = [
-      `site:facebook.com "${lookupTerm}"`,
-      `site:facebook.com "${lookupTerm}" "${city}"`,
-    ]
+    const result = await inspectEventUrlWithGroq({
+      url,
+      city,
+      state: state || undefined,
+      periodDays,
+      source,
+    })
 
-    let results: BraveWebResult[] = []
-
-    for (const query of queries) {
-      const found = await searchBraveWeb(query, 10)
-      results.push(...found)
-
-      if (
-        found.some((result) => {
-          const url = normalizeFacebookUrl(result.url || '')
-          return url && facebookResultScore(result, normalizedUrl, lookupTerm) >= 50
-        })
-      ) {
-        break
-      }
-    }
-
-    const facebookResults = results
-      .filter((result) => normalizeFacebookUrl(result.url || ''))
-      .sort(
-        (a, b) =>
-          facebookResultScore(b, normalizedUrl, lookupTerm) -
-          facebookResultScore(a, normalizedUrl, lookupTerm)
-      )
-
-    const bestScore = facebookResults[0]
-      ? facebookResultScore(facebookResults[0], normalizedUrl, lookupTerm)
-      : 0
-
-    if (facebookResults.length === 0 || bestScore < 20) {
+    if (!result.candidate) {
       return {
         success: false as const,
         error:
-          'O Brave ainda não encontrou esta URL do Facebook com confiança suficiente no índice público. Tente novamente mais tarde ou use a busca geral por cidade.',
+          'A Groq não conseguiu comprovar que esta URL representa um evento único dentro da janela selecionada. A página pode estar bloqueada, encerrada, fora do período ou sem data/horário/ano explícitos.',
       }
     }
 
-    const normalized = await normalizeBraveResult(
-      facebookResults[0],
-      {
-        city,
-        state: state || undefined,
-        periodDays,
-        sourceType: 'facebook',
-        forceEvent: true,
-      },
-      false
-    )
-
-    if (!normalized) {
-      return {
-        success: false as const,
-        error: 'A URL foi localizada, mas não foi possível montar um candidato de evento.',
-      }
-    }
-
-    normalized.source_url = normalizedUrl
-    normalized.source_domain = new URL(normalizedUrl).hostname.replace(/^www\./, '').toLowerCase()
-    normalized.source_type = 'facebook'
-    normalized.confidence = Math.min(normalized.confidence + 8, 100)
-    normalized.raw_data = {
-      ...normalized.raw_data,
-      manual_facebook_url: normalizedUrl,
-      brave_result_url: facebookResults[0].url,
-    }
-
-    const { error: insertError } = await auth.supabase
-      .from('event_candidates')
-      .upsert(normalized, {
-        onConflict: 'source_url',
-        ignoreDuplicates: true,
-      })
-
+    const insertError = await upsertCandidates(auth.supabase as any, [result.candidate])
     if (insertError) {
       return { success: false as const, error: databaseSetupMessage(insertError) }
     }
@@ -485,7 +332,7 @@ export async function importFacebookEventAction(input: ImportFacebookEventInput)
     const { data: matches, error: candidateError } = await auth.supabase
       .from('event_candidates')
       .select('*')
-      .eq('source_url', normalizedUrl)
+      .eq('source_url', result.candidate.source_url)
       .limit(1)
 
     if (candidateError || !matches?.[0]) {
@@ -507,167 +354,7 @@ export async function importFacebookEventAction(input: ImportFacebookEventInput)
     if (candidate.status === 'approved') {
       return {
         success: false as const,
-        error: 'Esta URL do Facebook já foi aprovada e publicada anteriormente.',
-      }
-    }
-
-    return {
-      success: true as const,
-      candidate,
-    }
-  } catch (error) {
-    console.error('Erro ao importar URL do Facebook:', error)
-    return {
-      success: false as const,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Erro inesperado ao localizar a URL do Facebook pelo Brave.',
-    }
-  }
-}
-
-export async function importSymplaEventAction(input: ImportSymplaEventInput) {
-  const auth = await requireAdmin()
-  if (!auth.ok) return { success: false as const, error: auth.error }
-
-  if (!process.env.BRAVE_API_KEY) {
-    return {
-      success: false as const,
-      error: 'BRAVE_API_KEY não está configurada no ambiente do servidor.',
-    }
-  }
-
-  const normalizedUrl = normalizeSymplaUrl(cleanText(input.url, 1500))
-  const city = cleanText(input.city, 100)
-  const state = cleanText(input.state, 30).toUpperCase()
-  const periodDays = normalizePeriodDays(Number(input.periodDays))
-
-  if (!normalizedUrl) {
-    return {
-      success: false as const,
-      error: 'Informe uma URL válida de evento da Sympla.',
-    }
-  }
-
-  if (!city) {
-    return {
-      success: false as const,
-      error: 'Informe a cidade para ajudar a interpretar o evento.',
-    }
-  }
-
-  try {
-    const { numericId, slugText } = symplaLookupParts(normalizedUrl)
-    const queries = [
-      `"${normalizedUrl}"`,
-      numericId ? `site:sympla.com.br/evento "${numericId}"` : '',
-      slugText ? `site:sympla.com.br/evento "${slugText}" "${city}"` : '',
-    ].filter(Boolean)
-
-    const results: BraveWebResult[] = []
-
-    for (const query of queries) {
-      const found = await searchBraveWeb(query, 10)
-      results.push(...found)
-
-      if (
-        found.some(
-          (result) =>
-            normalizeSymplaUrl(result.url || '') &&
-            symplaResultScore(result, normalizedUrl, numericId, slugText) >= 70
-        )
-      ) {
-        break
-      }
-    }
-
-    const symplaResults = results
-      .filter((result) => normalizeSymplaUrl(result.url || ''))
-      .sort(
-        (a, b) =>
-          symplaResultScore(b, normalizedUrl, numericId, slugText) -
-          symplaResultScore(a, normalizedUrl, numericId, slugText)
-      )
-
-    const bestScore = symplaResults[0]
-      ? symplaResultScore(symplaResults[0], normalizedUrl, numericId, slugText)
-      : 0
-
-    if (symplaResults.length === 0 || bestScore < 20) {
-      return {
-        success: false as const,
-        error:
-          'O Brave ainda não encontrou esta página da Sympla com confiança suficiente. Tente a busca geral por cidade ou tente novamente mais tarde.',
-      }
-    }
-
-    const normalized = await normalizeBraveResult(
-      symplaResults[0],
-      {
-        city,
-        state: state || undefined,
-        periodDays,
-        sourceType: 'sympla',
-        forceEvent: true,
-      },
-      false
-    )
-
-    if (!normalized) {
-      return {
-        success: false as const,
-        error: 'A URL foi localizada, mas não foi possível montar um candidato de evento.',
-      }
-    }
-
-    normalized.source_url = normalizedUrl
-    normalized.source_domain = new URL(normalizedUrl).hostname.replace(/^www\./, '').toLowerCase()
-    normalized.source_type = 'sympla'
-    normalized.confidence = Math.min(normalized.confidence + 10, 100)
-    normalized.raw_data = {
-      ...normalized.raw_data,
-      manual_sympla_url: normalizedUrl,
-      brave_result_url: symplaResults[0].url,
-    }
-
-    const { error: insertError } = await auth.supabase
-      .from('event_candidates')
-      .upsert(normalized, {
-        onConflict: 'source_url',
-        ignoreDuplicates: true,
-      })
-
-    if (insertError) {
-      return { success: false as const, error: databaseSetupMessage(insertError) }
-    }
-
-    const { data: matches, error: candidateError } = await auth.supabase
-      .from('event_candidates')
-      .select('*')
-      .eq('source_url', normalizedUrl)
-      .limit(1)
-
-    if (candidateError || !matches?.[0]) {
-      return {
-        success: false as const,
-        error: databaseSetupMessage(candidateError) || 'Não foi possível carregar o candidato importado.',
-      }
-    }
-
-    const candidate = matches[0] as EventDiscoveryCandidate
-
-    if (candidate.status === 'rejected') {
-      return {
-        success: false as const,
-        error: 'Esta URL já foi recusada anteriormente e permanece bloqueada na fila.',
-      }
-    }
-
-    if (candidate.status === 'approved') {
-      return {
-        success: false as const,
-        error: 'Esta URL da Sympla já foi aprovada e publicada anteriormente.',
+        error: 'Esta URL já foi aprovada e publicada anteriormente.',
       }
     }
 
@@ -676,15 +363,27 @@ export async function importSymplaEventAction(input: ImportSymplaEventInput) {
       candidate: sanitizeCandidateForReview(candidate),
     }
   } catch (error) {
-    console.error('Erro ao importar URL da Sympla:', error)
+    console.error(`Erro ao importar URL de ${source} com Groq:`, error)
     return {
       success: false as const,
       error:
         error instanceof Error
           ? error.message
-          : 'Erro inesperado ao localizar a URL da Sympla pelo Brave.',
+          : 'Erro inesperado ao analisar a URL com Groq.',
     }
   }
+}
+
+export async function importFacebookEventAction(input: ImportFacebookEventInput) {
+  return importUrlWithGroq('facebook', input)
+}
+
+export async function importSymplaEventAction(input: ImportSymplaEventInput) {
+  return importUrlWithGroq('sympla', input)
+}
+
+export async function importRoleAgoraEventAction(input: ImportRoleAgoraEventInput) {
+  return importUrlWithGroq('roleagora', input)
 }
 
 export async function updateDiscoveryCandidateAction(
@@ -720,7 +419,7 @@ export async function updateDiscoveryCandidateAction(
       : {}
 
   const rawData =
-    existingCandidate.source_type === 'sympla' && updates.event_date !== undefined
+    updates.event_date !== undefined
       ? {
           ...existingRawData,
           date: {
