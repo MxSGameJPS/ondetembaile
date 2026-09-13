@@ -108,25 +108,33 @@ export async function groqCompoundJson<T>(
   prompt: string,
   options: CompoundJsonOptions = {}
 ): Promise<T> {
-  const buildBody = (content: string, maxCompletionTokens: number) => ({
-    model: GROQ_DISCOVERY_MODEL,
-    messages: [
-      {
-        role: 'user',
-        content,
+  const buildBody = (content: string, maxCompletionTokens: number) => {
+    const enabledTools = options.enabledTools ?? ['web_search']
+
+    return {
+      model: GROQ_DISCOVERY_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+      ...(enabledTools.length > 0
+        ? {
+            compound_custom: {
+              tools: {
+                enabled_tools: enabledTools,
+              },
+            },
+          }
+        : {}),
+      response_format: {
+        type: 'json_object',
       },
-    ],
-    compound_custom: {
-      tools: {
-        enabled_tools: options.enabledTools ?? ['web_search'],
-      },
-    },
-    response_format: {
-      type: 'json_object',
-    },
-    temperature: 0.1,
-    max_completion_tokens: maxCompletionTokens,
-  })
+      temperature: 0.1,
+      max_completion_tokens: maxCompletionTokens,
+    }
+  }
 
   const primaryPrompt = prompt.slice(0, 6000)
   let content: string

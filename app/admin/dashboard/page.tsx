@@ -170,8 +170,11 @@ export default function AdminDashboardPage() {
       const warningText = res.warnings?.length
         ? ` Algumas fontes tiveram avisos: ${res.warnings.join(' | ')}`
         : ''
+      const apifyText = res.apifyUsage
+        ? ` Facebook/Apify: ${res.apifyUsage.resultItems} post(s) coletado(s), ${res.apifyUsage.filteredPosts} enviado(s) para classificação, custo estimado desta busca US$ ${res.apifyUsage.estimatedCostUsd.toFixed(2)} e total mensal estimado US$ ${res.apifyUsage.monthlyEstimatedCostUsd.toFixed(2)} de US$ ${res.apifyUsage.monthlyBudgetUsd.toFixed(2)}.`
+        : ''
       setDiscoverySummary(
-        `Groq pesquisou e validou ${res.searched} resultado(s), aceitando ${res.found} evento(s) dentro de ${res.window.start} a ${res.window.end}.${warningText}`
+        `Foram processados ${res.searched} resultado(s), aceitando ${res.found} evento(s) dentro de ${res.window.start} a ${res.window.end}.${apifyText}${warningText}`
       )
     } else {
       setDiscoveryError(res.error)
