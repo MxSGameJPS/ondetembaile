@@ -135,10 +135,6 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className={styles.hero}>
         <div className="container">
-          <div className={styles.sloganBadge}>
-            <Sparkles size={14} />
-            <span>A Diversão começa aqui</span>
-          </div>
 
           <h1 className={styles.heroTitle}>
             Descubra o que está <span className="gradient-text">rolando perto de você.</span>

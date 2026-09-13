@@ -22,7 +22,7 @@ export default function RootLayout({
         <footer
           style={{
             borderTop: '1px solid rgba(245, 158, 11, 0.2)',
-            background: '#070a12',
+            background: 'radial-gradient(circle at top center, rgba(242, 106, 0, 0.22) 0%, rgba(17, 17, 17, 1) 75%)',
             padding: '2rem 1.5rem',
             textAlign: 'center',
             color: '#6b7280',
