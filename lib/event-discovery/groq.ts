@@ -137,12 +137,20 @@ function sourceMatches(source: DiscoverySource, value: string) {
 function isLikelyListing(event: StructuredEvent, source: DiscoverySource) {
   const text = `${event.title} ${event.source_title} ${event.source_snippet}`
 
-  if (source === 'roleagora') {
-    try {
-      if (new URL(event.source_url).pathname.toLowerCase().startsWith('/city/')) return true
-    } catch {
+  try {
+    const url = new URL(event.source_url)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    const path = url.pathname.toLowerCase()
+
+    if ((host === 'roleagora.com.br' || host.endsWith('.roleagora.com.br')) && !path.startsWith('/event/')) {
       return true
     }
+
+    if ((host === 'sympla.com.br' || host.endsWith('.sympla.com.br')) && !path.startsWith('/evento/')) {
+      return true
+    }
+  } catch {
+    return true
   }
 
   return SINGLE_EVENT_REJECTION_PATTERNS.some((pattern) => pattern.test(text))
@@ -151,6 +159,9 @@ function isLikelyListing(event: StructuredEvent, source: DiscoverySource) {
 function isInsideWindow(iso: string, start: string, end: string) {
   const match = iso.match(/^(\d{4}-\d{2}-\d{2})T/)
   if (!match) return false
+
+  const time = new Date(iso).getTime()
+  if (Number.isNaN(time)) return false
 
   return match[1] >= start && match[1] <= end
 }
