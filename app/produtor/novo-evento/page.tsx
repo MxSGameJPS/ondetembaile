@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createEventAction } from '@/app/actions/events'
+import { getCategoriesAction } from '@/app/actions/categories'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import EventMap from '@/components/EventMap'
@@ -9,7 +10,14 @@ import { PlusCircle, Upload, ArrowLeft, Image as ImageIcon, MapPin } from 'lucid
 import Link from 'next/link'
 import styles from './page.module.css'
 
+interface Category {
+  id: string
+  name: string
+  slug: string
+}
+
 export default function NewEventPage() {
+  const [categories, setCategories] = useState<Category[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -17,6 +25,8 @@ export default function NewEventPage() {
     address: '',
     city: '',
     state: 'RS',
+    category_id: '',
+    category_name: '',
     image_url: '',
     event_date: '',
     ticket_price: '',
@@ -30,6 +40,16 @@ export default function NewEventPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    async function loadCategories() {
+      const res = await getCategoriesAction()
+      if (res.success && res.data) {
+        setCategories(res.data)
+      }
+    }
+    loadCategories()
+  }, [])
 
   // Handle direct file upload to Supabase storage
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +85,16 @@ export default function NewEventPage() {
     }
   }
 
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const catId = e.target.value
+    const catObj = categories.find((c) => c.id === catId)
+    setFormData((prev) => ({
+      ...prev,
+      category_id: catId,
+      category_name: catObj ? catObj.name : '',
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -82,6 +112,8 @@ export default function NewEventPage() {
       address: formData.address,
       city: formData.city,
       state: formData.state,
+      category_id: formData.category_id,
+      category_name: formData.category_name,
       image_url: formData.image_url,
       event_date: formData.event_date,
       ticket_price: formData.ticket_price,
@@ -135,6 +167,24 @@ export default function NewEventPage() {
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             />
+          </div>
+
+          {/* Categoria do Evento */}
+          <div className="form-group">
+            <label className="form-label">Categoria do Evento *</label>
+            <select
+              required
+              className="form-select"
+              value={formData.category_id}
+              onChange={handleCategoryChange}
+            >
+              <option value="">Selecione uma categoria...</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Local & Cidade */}

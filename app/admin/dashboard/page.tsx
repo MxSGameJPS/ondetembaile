@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, UserX, UserCheck } from 'lucide-react'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle } from 'lucide-react'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
+import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 
@@ -21,10 +22,20 @@ interface ProfileItem {
   created_at: string
 }
 
+interface CategoryItem {
+  id: string
+  name: string
+  slug: string
+  created_at: string
+}
+
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'all-events'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'all-events' | 'categories'>('pending')
   const [events, setEvents] = useState<EventItem[]>([])
   const [profiles, setProfiles] = useState<ProfileItem[]>([])
+  const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [creatingCategory, setCreatingCategory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [adminRole, setAdminRole] = useState<string | null>(null)
   
@@ -70,11 +81,46 @@ export default function AdminDashboardPage() {
 
       if (profilesData) setProfiles(profilesData)
 
+      // Fetch Categories
+      const catRes = await getCategoriesAction()
+      if (catRes.success && catRes.data) {
+        setCategories(catRes.data)
+      }
+
       setLoading(false)
     }
 
     loadAdminData()
   }, [])
+
+  // Category Actions
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCategoryName.trim()) return
+
+    setCreatingCategory(true)
+    const res = await createCategoryAction(newCategoryName)
+    setCreatingCategory(false)
+
+    if (res.success && res.category) {
+      setCategories([...categories, res.category].sort((a, b) => a.name.localeCompare(b.name)))
+      setNewCategoryName('')
+      alert('Categoria criada com sucesso!')
+    } else {
+      alert(res.error || 'Erro ao criar categoria.')
+    }
+  }
+
+  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
+    if (confirm(`Tem certeza que deseja excluir a categoria "${categoryName}"?`)) {
+      const res = await deleteCategoryAction(categoryId)
+      if (res.success) {
+        setCategories(categories.filter((c) => c.id !== categoryId))
+      } else {
+        alert(res.error || 'Erro ao excluir categoria.')
+      }
+    }
+  }
 
   // Event Approval / Rejection Handler
   const handleApprove = async (eventId: string) => {
@@ -161,7 +207,7 @@ export default function AdminDashboardPage() {
           </div>
           <h1 className={styles.title}>Moderação & Gestão do Sistema</h1>
           <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '4px' }}>
-            Aprove/recuse eventos, gerencie produtores e monitore a plataforma.
+            Aprove/recuse eventos, gerencie categorias, produtores e monitore a plataforma.
           </p>
         </div>
       </div>
@@ -174,6 +220,14 @@ export default function AdminDashboardPage() {
         >
           <AlertOctagon size={16} />
           <span>Aprovação de Eventos ({pendingEvents.length})</span>
+        </button>
+
+        <button
+          className={`${styles.tabBtn} ${activeTab === 'categories' ? styles.tabBtnActive : ''}`}
+          onClick={() => setActiveTab('categories')}
+        >
+          <Tag size={16} />
+          <span>Categorias de Eventos ({categories.length})</span>
         </button>
 
         <button
@@ -243,13 +297,86 @@ export default function AdminDashboardPage() {
             </div>
           )}
         </div>
+      ) : activeTab === 'categories' ? (
+        /* Categories Management Tab */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          
+          {/* Create Category Form */}
+          <div className="glass-card">
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#f8fafc', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Tag size={18} color="#f59e0b" />
+              <span>Cadastrar Nova Categoria</span>
+            </h2>
+
+            <form onSubmit={handleCreateCategory} style={{ display: 'flex', gap: '0.75rem', maxWidth: '600px' }}>
+              <input
+                type="text"
+                required
+                placeholder="Ex: Pagode & Samba, Baile Tradicionalista, Sertanejo..."
+                className="form-input"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+              />
+              <button
+                type="submit"
+                disabled={creatingCategory}
+                className="btn-primary"
+                style={{ whiteSpace: 'nowrap', padding: '0.75rem 1.25rem' }}
+              >
+                <PlusCircle size={18} />
+                <span>{creatingCategory ? 'Salvando...' : 'Adicionar'}</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Categories List Table */}
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Nome da Categoria</th>
+                  <th>Identificador (Slug)</th>
+                  <th>Data de Criação</th>
+                  <th style={{ textAlign: 'right' }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((cat) => (
+                  <tr key={cat.id}>
+                    <td>
+                      <span style={{ fontWeight: 'bold', color: '#fde047' }}>{cat.name}</span>
+                    </td>
+                    <td>
+                      <code style={{ background: '#090d16', padding: '2px 8px', borderRadius: '4px', color: '#9ca3af', fontSize: '0.8rem' }}>
+                        {cat.slug}
+                      </code>
+                    </td>
+                    <td style={{ color: '#9ca3af', fontSize: '0.8rem' }}>
+                      {new Date(cat.created_at).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                        className="btn-danger"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                      >
+                        <Trash2 size={14} />
+                        <span>Excluir</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : activeTab === 'users' ? (
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
               <tr>
                 <th>Nome / Empresa</th>
-                <th>E-mail</th>
+                <th>E-mail ID</th>
                 <th>WhatsApp</th>
                 <th>Cidade</th>
                 <th>Papel (Role)</th>

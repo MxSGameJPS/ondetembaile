@@ -12,6 +12,8 @@ export interface EventItem {
   address: string
   city: string
   state?: string | null
+  category_id?: string | null
+  category_name?: string | null
   image_url: string
   event_date: string
   ticket_price: string
@@ -64,6 +66,13 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
           <Ticket size={12} />
           <span>{event.ticket_price}</span>
         </div>
+
+        {/* Category Tag if present */}
+        {event.category_name && (
+          <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(17, 24, 39, 0.85)', backdropFilter: 'blur(8px)', color: '#fde047', fontSize: '0.7rem', fontWeight: 'bold', padding: '3px 9px', borderRadius: '6px', border: '1px solid rgba(253, 224, 71, 0.3)' }}>
+            {event.category_name}
+          </div>
+        )}
 
         {/* Status Badge (for Producer/Admin view) */}
         {showStatus && event.status && (

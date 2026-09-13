@@ -11,6 +11,8 @@ export async function createEventAction(formData: {
   address: string
   city: string
   state?: string
+  category_id?: string
+  category_name?: string
   latitude?: number
   longitude?: number
   image_url: string
@@ -43,6 +45,8 @@ export async function createEventAction(formData: {
     .from('events')
     .insert({
       producer_id: user.id,
+      category_id: formData.category_id || null,
+      category_name: formData.category_name || null,
       title: formData.title,
       description: formData.description,
       location_name: formData.location_name || null,

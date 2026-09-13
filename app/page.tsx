@@ -2,10 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getCategoriesAction } from '@/app/actions/categories'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { Search, MapPin, Sparkles, PlusCircle } from 'lucide-react'
+import { Search, MapPin, Sparkles, PlusCircle, Tag } from 'lucide-react'
 import Link from 'next/link'
 import styles from './page.module.css'
+
+interface Category {
+  id: string
+  name: string
+  slug: string
+}
 
 // Demo events fallback in case DB is newly created
 const DEMO_EVENTS: EventItem[] = [
@@ -17,6 +24,7 @@ const DEMO_EVENTS: EventItem[] = [
     address: 'Av. das Indústrias, 1500 - Porto Alegre, RS',
     city: 'Porto Alegre',
     state: 'RS',
+    category_name: 'Baile Tradicionalista / Gaúcho',
     image_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80',
     event_date: new Date(Date.now() + 86400000 * 3).toISOString(),
     ticket_price: 'R$ 35,00',
@@ -31,6 +39,7 @@ const DEMO_EVENTS: EventItem[] = [
     address: 'Rua da Bahia, 320 - Caxias do Sul, RS',
     city: 'Caxias do Sul',
     state: 'RS',
+    category_name: 'Forró / Pé de Serra',
     image_url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
     event_date: new Date(Date.now() + 86400000 * 5).toISOString(),
     ticket_price: 'R$ 25,00',
@@ -45,6 +54,7 @@ const DEMO_EVENTS: EventItem[] = [
     address: 'Rua XV de Novembro, 450 - Pelotas, RS',
     city: 'Pelotas',
     state: 'RS',
+    category_name: 'Sertanejo',
     image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
     event_date: new Date(Date.now() + 86400000 * 7).toISOString(),
     ticket_price: 'R$ 40,00',
@@ -55,15 +65,25 @@ const DEMO_EVENTS: EventItem[] = [
 
 export default function HomePage() {
   const [searchCity, setSearchCity] = useState('')
-  const [filterPeriod, setFilterPeriod] = useState<'all' | 'weekend' | 'month'>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [filterPeriod, setFilterPeriod] = useState<'all' | 'weekend'>('all')
   const [events, setEvents] = useState<EventItem[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
   const supabase = createClient()
 
   useEffect(() => {
-    async function loadEvents() {
+    async function loadData() {
       setLoading(true)
+      
+      // Load Categories
+      const catRes = await getCategoriesAction()
+      if (catRes.success && catRes.data) {
+        setCategories(catRes.data)
+      }
+
+      // Load Events
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -73,20 +93,22 @@ export default function HomePage() {
       if (!error && data && data.length > 0) {
         setEvents(data)
       } else {
-        // Use DEMO_EVENTS if no events registered in database yet
         setEvents(DEMO_EVENTS)
       }
       setLoading(false)
     }
 
-    loadEvents()
+    loadData()
   }, [])
 
-  // Filter events by City search & Period
+  // Filter events by City search, Category & Period
   const filteredEvents = events.filter((e) => {
     const matchesCity = searchCity.trim() === '' || e.city.toLowerCase().includes(searchCity.toLowerCase().trim())
-    
     if (!matchesCity) return false
+
+    const matchesCategory = selectedCategory === 'all' || e.category_id === selectedCategory || e.category_name === selectedCategory
+
+    if (!matchesCategory) return false
 
     if (filterPeriod === 'weekend') {
       const eventDate = new Date(e.event_date)
@@ -149,21 +171,28 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className={styles.filters}>
+          {/* Category Filter Pills Bar */}
+          {categories.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1.5rem', scrollbarWidth: 'none' }}>
               <button
-                className={`${styles.filterBtn} ${filterPeriod === 'all' ? styles.filterBtnActive : ''}`}
-                onClick={() => setFilterPeriod('all')}
+                className={`${styles.filterBtn} ${selectedCategory === 'all' ? styles.filterBtnActive : ''}`}
+                onClick={() => setSelectedCategory('all')}
+                style={{ whiteSpace: 'nowrap' }}
               >
-                Todos os Eventos
+                Todas as Categorias
               </button>
-              <button
-                className={`${styles.filterBtn} ${filterPeriod === 'weekend' ? styles.filterBtnActive : ''}`}
-                onClick={() => setFilterPeriod('weekend')}
-              >
-                Este Fim de Semana
-              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  className={`${styles.filterBtn} ${selectedCategory === cat.id ? styles.filterBtnActive : ''}`}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {cat.name}
+                </button>
+              ))}
             </div>
-          </div>
+          )}
 
           {/* Grid of Events */}
           {loading ? (
