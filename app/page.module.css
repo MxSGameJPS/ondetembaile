@@ -37,24 +37,7 @@
     linear-gradient(to bottom, rgba(6, 6, 6, 0.55) 0%, rgba(6, 6, 6, 0.15) 40%, rgba(6, 6, 6, 0.94) 100%);
 }
 
-/* ---- AMBIENT NIGHTCLUB LIGHTS SYSTEM (100% BRAND ORANGE & GOLD PALETTE) ---- */
-
-/* KEYFRAMES defined inside CSS module for 100% Turbopack scoping */
-@keyframes clubSpotlightSweep {
-  0%   { transform: rotate(-45deg) scale(0.9); opacity: 0.25; }
-  25%  { transform: rotate(15deg) scale(1.25); opacity: 0.95; }
-  50%  { transform: rotate(45deg) scale(0.9); opacity: 0.35; }
-  75%  { transform: rotate(-20deg) scale(1.2); opacity: 0.9; }
-  100% { transform: rotate(-45deg) scale(0.9); opacity: 0.25; }
-}
-
-@keyframes clubRealPulse {
-  0%   { opacity: 0.2; transform: scale(0.85); }
-  25%  { opacity: 1;   transform: scale(1.2); }
-  50%  { opacity: 0.25; transform: scale(0.92); }
-  75%  { opacity: 0.95; transform: scale(1.15); }
-  100% { opacity: 0.2; transform: scale(0.85); }
-}
+/* ---- STATIC AMBIENT NIGHTCLUB LIGHTS (100% BRAND ORANGE & GOLD PALETTE) ---- */
 
 @keyframes heroCinematicZoom {
   0%   { transform: scale(1); }
@@ -87,7 +70,8 @@
   max-width: 720px;
   max-height: 720px;
   background: radial-gradient(circle, rgba(242, 106, 0, 0.9) 0%, rgba(242, 106, 0, 0.2) 50%, rgba(242, 106, 0, 0) 75%);
-  animation: clubRealPulse 3.2s ease-in-out infinite;
+  opacity: 0.34;
+  transform: scale(0.95);
 }
 
 /* Stage Flare Warm Orange Glow */
@@ -99,7 +83,8 @@
   max-width: 780px;
   max-height: 780px;
   background: radial-gradient(circle, rgba(255, 140, 0, 0.8) 0%, rgba(255, 140, 0, 0.15) 50%, rgba(255, 140, 0, 0) 72%);
-  animation: clubRealPulse 4.4s ease-in-out infinite 0.8s;
+  opacity: 0.28;
+  transform: scale(1);
 }
 
 /* Sweeping Brand Spotlight Beam */
@@ -113,7 +98,8 @@
   background: conic-gradient(from 180deg at 50% 0%, rgba(242, 106, 0, 0.9) 0deg, rgba(255, 183, 0, 0.5) 40deg, transparent 95deg);
   filter: blur(28px);
   transform-origin: top center;
-  animation: clubSpotlightSweep 5.2s ease-in-out infinite 0.2s;
+  opacity: 0.22;
+  transform: rotate(-20deg) scale(1);
 }
 
 .heroContent {
