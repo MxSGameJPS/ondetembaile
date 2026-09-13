@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCategoriesAction } from '@/app/actions/categories'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { Search, MapPin, Sparkles, PlusCircle, Tag, RotateCcw } from 'lucide-react'
+import { Search, MapPin, PlusCircle, Tag, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import styles from './page.module.css'
 
@@ -132,24 +132,32 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Hero Section with Cinematic Background & Party Light Effects */}
+      {/* Hero Section */}
       <section className={styles.hero}>
+        {/* Layer 0: Background image with subtle cinematic zoom */}
         <div className={styles.heroBgImage} />
+
+        {/* Layer 1: Ambient nightclub lights — blinking (marca: laranja) */}
+        <div className={styles.clubLights} aria-hidden="true">
+          <span className={`${styles.clubLight} ${styles.clubLightA}`} />
+          <span className={`${styles.clubLight} ${styles.clubLightB}`} />
+          <span className={`${styles.clubLight} ${styles.clubLightC}`} />
+          <span className={`${styles.clubLight} ${styles.clubLightD}`} />
+        </div>
+
+        {/* Layer 2: Legibility overlay + vignette */}
         <div className={styles.heroOverlay} />
-        <div className={styles.partyStrobeLayer} />
 
         <div className={`container ${styles.heroContent}`}>
-          
-
           <h1 className={styles.heroTitle}>
             Descubra o que está <span className="gradient-text">rolando perto de você.</span>
           </h1>
           <p className={styles.heroSubtitle}>
-            Festas, shows, bailes e eventos da sua região.
+            Festas, shows, bailes e eventos da sua região — a agitação da sua cidade em um só lugar.
           </p>
 
           {/* Dual Search Box: Cidade + Categoria */}
-          <div className={styles.searchBoxGrid}>
+          <div className={`${styles.searchBoxGrid} ${styles.searchBoxAnim}`}>
             {/* Input 1: Cidade */}
             <div className={styles.searchInputWrapper}>
               <MapPin size={18} color="#F26A00" />
