@@ -143,6 +143,19 @@ function isSymplaEventUrl(value: string) {
   }
 }
 
+function isRoleAgoraDomain(domain: string) {
+  return domain === 'roleagora.com.br' || domain.endsWith('.roleagora.com.br')
+}
+
+function isRoleAgoraEventUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return isRoleAgoraDomain(url.hostname.toLowerCase()) && /\/event(?:\/|$)/i.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
 function resolvePublicAssetUrl(value: string | null, baseUrl: string) {
   if (!value) return null
 
@@ -380,12 +393,13 @@ function isClearlyStaleSymplaResult(result: BraveWebResult) {
 function parseDateFromText(
   text: string,
   periodDays: number,
-  options: { requireExplicitYear?: boolean } = {}
+  options: { requireExplicitYear?: boolean; requireExplicitTime?: boolean } = {}
 ) {
   const numeric = text.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?(?:\s+(?:às?|as)?\s*(\d{1,2})(?::|h)(\d{2})?)?/i)
 
   if (numeric) {
     if (options.requireExplicitYear && !numeric[3]) return null
+    if (options.requireExplicitTime && !numeric[4]) return null
 
     const day = Number(numeric[1])
     const monthIndex = Number(numeric[2]) - 1
@@ -403,6 +417,7 @@ function parseDateFromText(
 
   if (named) {
     if (options.requireExplicitYear && !named[3]) return null
+    if (options.requireExplicitTime && !named[4]) return null
 
     const day = Number(named[1])
     const monthIndex = MONTHS[named[2].toLowerCase()]
@@ -456,6 +471,7 @@ function resolveSourceType(url: string, fallback: DiscoverySource): DiscoverySou
   if (domain.includes('reddit.com')) return 'reddit'
   if (isFacebookDomain(domain)) return 'facebook'
   if (isSymplaDomain(domain)) return 'sympla'
+  if (isRoleAgoraDomain(domain)) return 'roleagora'
 
   return fallback
 }
@@ -504,8 +520,11 @@ export async function normalizeBraveResult(
   const facebookEvent = isFacebookEventUrl(sourceUrl)
   const symplaSource = isSymplaDomain(sourceDomain)
   const symplaEvent = isSymplaEventUrl(sourceUrl)
+  const roleAgoraSource = isRoleAgoraDomain(sourceDomain)
+  const roleAgoraEvent = isRoleAgoraEventUrl(sourceUrl)
 
   if (symplaSource && !symplaEvent) return null
+  if (roleAgoraSource && !roleAgoraEvent) return null
   if (symplaSource && isClearlyStaleSymplaResult(result)) return null
 
   const braveText = decodeHtml(
@@ -516,11 +535,12 @@ export async function normalizeBraveResult(
     context.forceEvent ||
     facebookEvent ||
     symplaEvent ||
+    roleAgoraEvent ||
     EVENT_KEYWORDS.some((keyword) => braveText.toLowerCase().includes(keyword))
   if (!looksLikeEvent) return null
 
-  // Facebook and Sympla are intentionally discovery-only through Brave.
-  // Do not crawl those platforms directly from this pipeline.
+  // Facebook and Sympla stay discovery-only through Brave.
+  // Generic web and Rolê Agora may expose structured Event metadata publicly.
   const html =
     enrichFromPage && !facebookSource && !symplaSource
       ? await fetchPublicPage(sourceUrl)
@@ -558,7 +578,8 @@ export async function normalizeBraveResult(
   const eventDate =
     structuredDate ??
     parseDateFromText(dateText, context.periodDays, {
-      requireExplicitYear: symplaSource,
+      requireExplicitYear: true,
+      requireExplicitTime: true,
     })
   const rawImage =
     jsonLdImage(jsonLdEvent?.image) ||
@@ -593,6 +614,8 @@ export async function normalizeBraveResult(
   if (facebookEvent) confidence += 8
   if (symplaSource) confidence += 7
   if (symplaEvent) confidence += 6
+  if (roleAgoraSource) confidence += 7
+  if (roleAgoraEvent) confidence += 6
 
   return {
     title: truncate(decodeHtml(rawTitle), 180),
@@ -629,7 +652,7 @@ export async function normalizeBraveResult(
       date: {
         source_explicit_year: sourceHasExplicitYear,
         inferred_without_year: Boolean(eventDate && !structuredDate && !sourceHasExplicitYear),
-        policy: symplaSource ? 'sympla-explicit-year-required' : 'default',
+        policy: 'brave-explicit-year-and-time-required',
       },
     },
   }
