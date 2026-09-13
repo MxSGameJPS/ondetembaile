@@ -568,11 +568,11 @@ export default function AdminDashboardPage() {
               <div>
                 <div className={styles.discoveryEyebrow}>
                   <Sparkles size={15} />
-                  <span>Descoberta com Apify + Groq por fonte</span>
+                  <span>Descoberta com Apify + Brave</span>
                 </div>
                 <h2>Encontrar eventos em fontes públicas</h2>
                 <p>
-                  Facebook usa somente Apify e todos os posts coletados vão para revisão manual. As demais fontes continuam usando Groq para descoberta e validação.
+                  Facebook usa somente Apify e todos os posts coletados vão para revisão manual. Web, Reddit, Sympla e Rolê Agora usam Brave para descobrir URLs e validação local no servidor, sem Groq Web Search.
                 </p>
               </div>
 
