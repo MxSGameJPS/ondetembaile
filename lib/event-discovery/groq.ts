@@ -208,14 +208,7 @@ function decodeHtml(value: string) {
 }
 
 function extractMeta(html: string, key: string) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\function domainOf(value: string) {
-  try {
-    return new URL(value).hostname.toLowerCase().replace(/^www\./, '')
-  } catch {
-    return 'desconhecido'
-  }
-}
-')
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const patterns = [
     new RegExp(`<meta[^>]*(?:property|name)=["']${escaped}["'][^>]*content=["']([^"']+)["'][^>]*>`, 'i'),
     new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']${escaped}["'][^>]*>`, 'i'),
@@ -228,7 +221,6 @@ function extractMeta(html: string, key: string) {
 
   return ''
 }
-
 async function fetchExactPublicContext(value: string) {
   try {
     const response = await fetch(value, {
