@@ -47,6 +47,7 @@ export interface NormalizedDiscoveredEvent {
   title: string
   description: string
   event_date: string | null
+  event_end_date: string | null
   location_name: string | null
   address: string
   city: string
@@ -573,6 +574,16 @@ export async function normalizeBraveResult(
       ? structuredDateCandidate
       : null
 
+  const structuredEndDateCandidate =
+    typeof jsonLdEvent?.endDate === 'string' && !Number.isNaN(new Date(jsonLdEvent.endDate).getTime())
+      ? new Date(jsonLdEvent.endDate).toISOString()
+      : null
+  const structuredEndDate =
+    structuredEndDateCandidate &&
+    (!structuredDate || new Date(structuredEndDateCandidate).getTime() >= new Date(structuredDate).getTime())
+      ? structuredEndDateCandidate
+      : null
+
   const dateText = `${braveText} ${rawTitle} ${rawDescription}`
   const sourceHasExplicitYear = hasExplicitCalendarYear(dateText)
   const eventDate =
@@ -621,6 +632,7 @@ export async function normalizeBraveResult(
     title: truncate(decodeHtml(rawTitle), 180),
     description: truncate(decodeHtml(rawDescription || 'Evento encontrado em fonte pública.'), 1600),
     event_date: eventDate,
+    event_end_date: structuredEndDate,
     location_name: location.locationName,
     address: truncate(address || `${context.city}${context.state ? `, ${context.state}` : ''}`, 300),
     city: truncate(city, 100),
