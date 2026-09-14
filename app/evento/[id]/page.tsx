@@ -30,6 +30,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
       longitude: -51.2177,
       image_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
       event_date: new Date(Date.now() + 86400000 * 3).toISOString(),
+      event_end_date: null,
       ticket_price: 'R$ 35,00',
       whatsapp_info: '51999998888',
       facebook_url: 'https://facebook.com',
@@ -52,14 +53,23 @@ export default async function EventDetailPage({ params }: EventPageProps) {
     notFound()
   }
 
-  const formattedDate = new Date(event.event_date).toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const startDate = new Date(event.event_date)
+  const endDate = event.event_end_date ? new Date(event.event_end_date) : null
+  const validEndDate = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
+
+  const formatFullDate = (date: Date) =>
+    date.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+  const formattedDate = validEndDate
+    ? `De ${formatFullDate(startDate)} até ${formatFullDate(validEndDate)}`
+    : formatFullDate(startDate)
 
   const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
   const whatsappUrl = cleanWhatsapp
