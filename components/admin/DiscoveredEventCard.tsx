@@ -56,6 +56,7 @@ function createDraft(candidate: EventDiscoveryCandidate) {
     title: candidate.title ?? '',
     description: candidate.description ?? '',
     event_date: toDateTimeLocal(candidate.event_date),
+    event_end_date: toDateTimeLocal(candidate.event_end_date),
     location_name: candidate.location_name ?? '',
     address: candidate.address ?? '',
     city: candidate.city ?? '',
@@ -83,12 +84,20 @@ export default function DiscoveredEventCard({
 
   const persistedDraft = useMemo(() => createDraft(candidate), [candidate])
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(persistedDraft)
-  const canApprove = Boolean(draft.title.trim() && draft.city.trim() && draft.event_date)
+  const endBeforeStart = Boolean(
+    draft.event_date &&
+      draft.event_end_date &&
+      new Date(draft.event_end_date).getTime() < new Date(draft.event_date).getTime()
+  )
+  const canApprove = Boolean(
+    draft.title.trim() && draft.city.trim() && draft.event_date && !endBeforeStart
+  )
 
   const patch: UpdateDiscoveryCandidateInput = {
     title: draft.title,
     description: draft.description || null,
     event_date: toIso(draft.event_date),
+    event_end_date: toIso(draft.event_end_date),
     location_name: draft.location_name || null,
     address: draft.address || null,
     city: draft.city,
@@ -183,12 +192,26 @@ export default function DiscoveredEventCard({
           <label className={styles.field}>
             <span>
               <CalendarClock size={13} />
-              Data e hora *
+              Início *
             </span>
             <input
               type="datetime-local"
               value={draft.event_date}
               onChange={(event) => setDraft({ ...draft, event_date: event.target.value })}
+              disabled={busy}
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span>
+              <CalendarClock size={13} />
+              Término (opcional)
+            </span>
+            <input
+              type="datetime-local"
+              min={draft.event_date || undefined}
+              value={draft.event_end_date}
+              onChange={(event) => setDraft({ ...draft, event_end_date: event.target.value })}
               disabled={busy}
             />
           </label>
@@ -289,7 +312,9 @@ export default function DiscoveredEventCard({
 
         {!canApprove && (
           <div className={styles.warning}>
-            Preencha título, cidade e data/hora antes de aprovar.
+            {endBeforeStart
+              ? 'A data final precisa ser igual ou posterior à data inicial.'
+              : 'Preencha título, cidade e data/hora de início antes de aprovar.'}
           </div>
         )}
 
