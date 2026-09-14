@@ -242,7 +242,12 @@ export default function NewEventPage() {
               <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold', marginBottom: '0.4rem' }}>
                 Pré-visualização da Localização no Mapa:
               </div>
-              <EventMap address={formData.address} locationName={formData.location_name} />
+              <EventMap
+                address={formData.address}
+                locationName={formData.location_name}
+                city={formData.city}
+                state={formData.state}
+              />
             </div>
           )}
 
