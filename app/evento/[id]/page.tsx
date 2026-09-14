@@ -131,6 +131,8 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             <EventMap
               address={event.address}
               locationName={event.location_name || ''}
+              city={event.city}
+              state={event.state || ''}
               latitude={event.latitude}
               longitude={event.longitude}
             />
