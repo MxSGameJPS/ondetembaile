@@ -606,6 +606,7 @@ function normalizeCompoundEvent(value: unknown): StructuredEvent | null {
     title: stringValue('title'),
     description: stringValue('description'),
     event_date: stringValue('event_date'),
+    event_end_date: stringValue('event_end_date'),
     location_name: stringValue('location_name'),
     address: stringValue('address'),
     city: stringValue('city'),
