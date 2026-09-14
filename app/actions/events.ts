@@ -42,6 +42,19 @@ export async function createEventAction(formData: {
     return { success: false, error: 'Sua conta está bloqueada ou banida de cadastrar eventos.' }
   }
 
+  const startTime = new Date(formData.event_date).getTime()
+  const endTime = formData.event_end_date
+    ? new Date(formData.event_end_date).getTime()
+    : null
+
+  if (Number.isNaN(startTime)) {
+    return { success: false, error: 'Informe uma data inicial válida.' }
+  }
+
+  if (endTime !== null && (Number.isNaN(endTime) || endTime < startTime)) {
+    return { success: false, error: 'A data final precisa ser igual ou posterior à data inicial.' }
+  }
+
   const { data: event, error: insertError } = await supabase
     .from('events')
     .insert({
