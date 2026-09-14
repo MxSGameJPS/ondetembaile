@@ -162,9 +162,23 @@ export default function HomePage() {
     if (!matchesCategory) return false
 
     if (filterPeriod === 'weekend') {
-      const eventDate = new Date(e.event_date)
-      const day = eventDate.getDay()
-      return day === 5 || day === 6 || day === 0 // Fri, Sat, Sun
+      const start = new Date(e.event_date)
+      const end = e.event_end_date ? new Date(e.event_end_date) : start
+
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false
+
+      const cursor = new Date(start)
+      const last = end.getTime() >= start.getTime() ? end : start
+      let checkedDays = 0
+
+      while (cursor.getTime() <= last.getTime() && checkedDays < 120) {
+        const day = cursor.getDay()
+        if (day === 5 || day === 6 || day === 0) return true
+        cursor.setDate(cursor.getDate() + 1)
+        checkedDays += 1
+      }
+
+      return false
     }
 
     return true
