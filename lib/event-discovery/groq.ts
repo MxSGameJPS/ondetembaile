@@ -12,6 +12,7 @@ export interface GroqEventCandidate {
   title: string
   description: string
   event_date: string
+  event_end_date?: string | null
   location_name: string | null
   address: string
   city: string
