@@ -16,6 +16,7 @@ export interface EventItem {
   category_name?: string | null
   image_url: string
   event_date: string
+  event_end_date?: string | null
   ticket_price: string
   whatsapp_info?: string | null
   source_url?: string | null
@@ -32,13 +33,22 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, showStatus = false, adminActions }: EventCardProps) {
-  const formattedDate = new Date(event.event_date).toLocaleDateString('pt-BR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const startDate = new Date(event.event_date)
+  const endDate = event.event_end_date ? new Date(event.event_end_date) : null
+  const validEndDate = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
+
+  const formatEventDate = (date: Date, includeWeekday = true) =>
+    date.toLocaleDateString('pt-BR', {
+      ...(includeWeekday ? { weekday: 'short' as const } : {}),
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+  const formattedDate = validEndDate
+    ? `${formatEventDate(startDate)} → ${formatEventDate(validEndDate, false)}`
+    : formatEventDate(startDate)
 
   // Format WhatsApp number link when a contact number is available.
   const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
