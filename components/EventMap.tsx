@@ -115,9 +115,13 @@ export default function EventMap({
     return () => controller.abort()
   }, [address, locationName, city, state, latitude, longitude])
 
+  const mapQuery = addressQuery || address || locationName || ''
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    addressQuery || address || locationName || ''
+    mapQuery
   )}`
+  const googleMapsEmbedUrl = mapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=16&output=embed`
+    : ''
 
   if (!isMounted) return null
 
@@ -156,6 +160,14 @@ export default function EventMap({
             className={styles.mapIframe}
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lng - 0.01}%2C${coords.lat - 0.01}%2C${coords.lng + 0.01}%2C${coords.lat + 0.01}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`}
           />
+        ) : googleMapsEmbedUrl ? (
+          <iframe
+            title="Mapa do Evento no Google Maps"
+            className={styles.mapIframe}
+            src={googleMapsEmbedUrl}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
             <MapPin size={22} />
@@ -163,9 +175,6 @@ export default function EventMap({
               {geocodeFailed
                 ? 'Não foi possível confirmar este endereço no mapa automaticamente.'
                 : 'Localização ainda não disponível.'}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-              Use “Abrir no Google Maps” para pesquisar pelo endereço informado.
             </span>
           </div>
         )}
