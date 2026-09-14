@@ -96,10 +96,18 @@ function sourceUrlAllowed(source: DiscoverySource, value: string) {
   }
 }
 
-function insideWindow(eventDate: string | null, start: string, end: string) {
+function insideWindow(
+  eventDate: string | null,
+  eventEndDate: string | null | undefined,
+  start: string,
+  end: string
+) {
   if (!eventDate) return false
-  const day = eventDate.slice(0, 10)
-  return day >= start && day <= end
+
+  const startDay = eventDate.slice(0, 10)
+  const endDay = (eventEndDate || eventDate).slice(0, 10)
+
+  return startDay <= end && endDay >= start
 }
 
 export async function discoverEventsWithBrave(input: BraveDiscoveryInput) {
@@ -137,7 +145,10 @@ export async function discoverEventsWithBrave(input: BraveDiscoveryInput) {
           source === 'web' || source === 'roleagora'
         )
 
-        if (!normalized || !insideWindow(normalized.event_date, start, end)) continue
+        if (
+          !normalized ||
+          !insideWindow(normalized.event_date, normalized.event_end_date, start, end)
+        ) continue
         if (normalized.source_type === 'facebook') continue
 
         events.push(normalized as GroqEventCandidate)

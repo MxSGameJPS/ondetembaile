@@ -12,6 +12,7 @@ export interface GroqEventCandidate {
   title: string
   description: string
   event_date: string
+  event_end_date?: string | null
   location_name: string | null
   address: string
   city: string
@@ -35,6 +36,7 @@ interface StructuredEvent {
   title: string
   description: string
   event_date: string
+  event_end_date: string
   location_name: string
   address: string
   city: string
@@ -279,6 +281,7 @@ const EVENT_SCHEMA = {
           'title',
           'description',
           'event_date',
+          'event_end_date',
           'location_name',
           'address',
           'city',
@@ -299,6 +302,7 @@ const EVENT_SCHEMA = {
           title: { type: 'string' },
           description: { type: 'string' },
           event_date: { type: 'string' },
+          event_end_date: { type: 'string' },
           location_name: { type: 'string' },
           address: { type: 'string' },
           city: { type: 'string' },
@@ -348,6 +352,7 @@ ${exactUrlInstruction}
 Regras obrigatórias:
 - is_single_event=true somente para UMA página/post que represente UM evento específico.
 - event_date deve estar em ISO 8601 com data, hora e ano explicitamente comprovados pelo material. Se faltar ano OU horário, use string vazia.
+- event_end_date deve conter o término em ISO 8601 quando a fonte comprovar um período; caso contrário, use string vazia. Nunca coloque término anterior ao início.
 - date_evidence deve copiar/resumir a evidência que contém o ano. Se não houver ano explícito, deixe vazio.
 - eventos fora da janela devem ser marcados is_single_event=false.
 - eventos encerrados/passados devem ser marcados is_single_event=false.
@@ -382,6 +387,12 @@ function toCandidate(
 
   const sourceUrl = normalizeUrl(event.source_url)
   const confidence = Math.max(0, Math.min(event.confidence, 100))
+  const startTime = new Date(event.event_date).getTime()
+  const rawEndTime = event.event_end_date ? new Date(event.event_end_date).getTime() : null
+  const normalizedEndDate =
+    rawEndTime !== null && !Number.isNaN(rawEndTime) && rawEndTime >= startTime
+      ? new Date(rawEndTime).toISOString()
+      : null
 
   return {
     title: event.title.trim().slice(0, 180),
@@ -389,6 +400,7 @@ function toCandidate(
       .trim()
       .slice(0, 1600),
     event_date: new Date(event.event_date).toISOString(),
+    event_end_date: normalizedEndDate,
     location_name: event.location_name.trim() || null,
     address: (event.address.trim() || [event.city, event.state].filter(Boolean).join(', ')).slice(0, 300),
     city: event.city.trim().slice(0, 100),
@@ -594,6 +606,7 @@ function normalizeCompoundEvent(value: unknown): StructuredEvent | null {
     title: stringValue('title'),
     description: stringValue('description'),
     event_date: stringValue('event_date'),
+    event_end_date: stringValue('event_end_date'),
     location_name: stringValue('location_name'),
     address: stringValue('address'),
     city: stringValue('city'),
@@ -634,7 +647,7 @@ function compoundSourceRules(sources: DiscoverySource[]) {
 function compoundJsonShape() {
   return [
     'Retorne SOMENTE JSON válido no formato:',
-    '{"events":[{"is_single_event":true,"rejection_reason":"","title":"","description":"","event_date":"YYYY-MM-DDTHH:mm:ss-03:00","location_name":"","address":"","city":"","state":"","category_name":"","image_url":"","ticket_price":"","whatsapp_info":"","source_url":"https://...","source_title":"","source_snippet":"","date_evidence":"trecho com ano e horário","confidence":0}]}',
+    '{"events":[{"is_single_event":true,"rejection_reason":"","title":"","description":"","event_date":"YYYY-MM-DDTHH:mm:ss-03:00","event_end_date":"","location_name":"","address":"","city":"","state":"","category_name":"","image_url":"","ticket_price":"","whatsapp_info":"","source_url":"https://...","source_title":"","source_snippet":"","date_evidence":"trecho com ano e horário","confidence":0}]}',
     'Campos desconhecidos devem ser string vazia. Não escreva texto fora do JSON.',
   ].join('\n')
 }

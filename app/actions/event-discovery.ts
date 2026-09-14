@@ -146,8 +146,26 @@ function sanitizeCandidateForReview(candidate: EventDiscoveryCandidate) {
   if (!candidate.event_date) return candidate
 
   const eventTime = new Date(candidate.event_date).getTime()
-  if (!Number.isNaN(eventTime) && eventTime < Date.now() - 6 * 60 * 60 * 1000) {
-    return { ...candidate, event_date: null, confidence: Math.min(candidate.confidence, 35) }
+  const endTime = candidate.event_end_date
+    ? new Date(candidate.event_end_date).getTime()
+    : null
+
+  if (endTime !== null && !Number.isNaN(endTime) && endTime < eventTime) {
+    return {
+      ...candidate,
+      event_end_date: null,
+      confidence: Math.min(candidate.confidence, 45),
+    }
+  }
+
+  const effectiveEnd = endTime !== null && !Number.isNaN(endTime) ? endTime : eventTime
+  if (!Number.isNaN(effectiveEnd) && effectiveEnd < Date.now() - 6 * 60 * 60 * 1000) {
+    return {
+      ...candidate,
+      event_date: null,
+      event_end_date: null,
+      confidence: Math.min(candidate.confidence, 35),
+    }
   }
 
   const metadata = candidateDateMetadata(candidate)
@@ -421,13 +439,17 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     if (!candidate.event_date) return false
 
     const eventTime = new Date(candidate.event_date).getTime()
+    const candidateEndTime = candidate.event_end_date
+      ? new Date(candidate.event_end_date).getTime()
+      : eventTime
     const startTime = new Date(startIso).getTime()
     const endTime = new Date(endIso).getTime()
 
     return (
       !Number.isNaN(eventTime) &&
-      eventTime >= startTime &&
-      eventTime <= endTime
+      !Number.isNaN(candidateEndTime) &&
+      eventTime <= endTime &&
+      candidateEndTime >= startTime
     )
   })
 
@@ -585,6 +607,7 @@ export async function importFacebookEventAction(input: ImportFacebookEventInput)
     description:
       'URL adicionada manualmente. Abra a fonte, confira os dados do evento e complete os campos antes de aprovar.',
     event_date: null,
+    event_end_date: null,
     location_name: null,
     address: [city, state].filter(Boolean).join(', '),
     city,
@@ -651,7 +674,7 @@ export async function updateDiscoveryCandidateAction(
 
   const { data: existingCandidate, error: existingError } = await auth.supabase
     .from('event_candidates')
-    .select('source_type, raw_data')
+    .select('source_type, raw_data, event_date, event_end_date')
     .eq('id', candidateId)
     .eq('status', 'pending')
     .single()
@@ -690,6 +713,8 @@ export async function updateDiscoveryCandidateAction(
     title: updates.title !== undefined ? cleanText(updates.title, 180) : undefined,
     description: updates.description !== undefined ? cleanText(updates.description, 1600) || null : undefined,
     event_date: updates.event_date !== undefined ? updates.event_date || null : undefined,
+    event_end_date:
+      updates.event_end_date !== undefined ? updates.event_end_date || null : undefined,
     location_name:
       updates.location_name !== undefined ? cleanText(updates.location_name, 180) || null : undefined,
     address: updates.address !== undefined ? cleanText(updates.address, 300) || null : undefined,
@@ -711,6 +736,25 @@ export async function updateDiscoveryCandidateAction(
   const payload = Object.fromEntries(
     Object.entries(allowedUpdates).filter(([, value]) => value !== undefined)
   )
+
+  const nextStart = updates.event_date !== undefined
+    ? updates.event_date
+    : existingCandidate.event_date
+  const nextEnd = updates.event_end_date !== undefined
+    ? updates.event_end_date
+    : existingCandidate.event_end_date
+
+  if (nextStart && nextEnd) {
+    const startTime = new Date(nextStart).getTime()
+    const endTime = new Date(nextEnd).getTime()
+
+    if (Number.isNaN(startTime) || Number.isNaN(endTime) || endTime < startTime) {
+      return {
+        success: false as const,
+        error: 'A data final precisa ser igual ou posterior à data inicial.',
+      }
+    }
+  }
 
   const { data, error } = await auth.supabase
     .from('event_candidates')
@@ -764,15 +808,29 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
   if (!candidate.title || !candidate.city || !candidate.event_date) {
     return {
       success: false as const,
-      error: 'Preencha título, cidade e data do evento antes de aprovar.',
+      error: 'Preencha título, cidade e data inicial do evento antes de aprovar.',
     }
   }
 
   const eventTime = new Date(candidate.event_date).getTime()
-  if (Number.isNaN(eventTime) || eventTime < Date.now() - 6 * 60 * 60 * 1000) {
+  const eventEndTime = candidate.event_end_date
+    ? new Date(candidate.event_end_date).getTime()
+    : null
+  if (
+    Number.isNaN(eventTime) ||
+    (eventEndTime === null && eventTime < Date.now() - 6 * 60 * 60 * 1000) ||
+    (eventEndTime !== null && (Number.isNaN(eventEndTime) || eventEndTime < Date.now() - 6 * 60 * 60 * 1000))
+  ) {
     return {
       success: false as const,
-      error: 'A data do evento é inválida ou já passou. Revise a fonte antes de publicar.',
+      error: 'A data do evento é inválida ou o período já terminou. Revise antes de publicar.',
+    }
+  }
+
+  if (eventEndTime !== null && eventEndTime < eventTime) {
+    return {
+      success: false as const,
+      error: 'A data final precisa ser igual ou posterior à data inicial.',
     }
   }
 
@@ -807,6 +865,7 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
       state: candidate.state || null,
       image_url: candidate.image_url || '/img_hero/image.png',
       event_date: candidate.event_date,
+      event_end_date: candidate.event_end_date || null,
       ticket_price: candidate.ticket_price || 'Consultar',
       whatsapp_info: candidate.whatsapp_info || '',
       facebook_url: candidate.source_type === 'facebook' ? candidate.source_url : null,
