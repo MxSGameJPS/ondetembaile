@@ -87,6 +87,7 @@ export function mapFacebookPostsToReviewCandidates(input: {
         text ||
         'Post encontrado pela Apify. Abra a fonte e complete os dados antes de publicar.',
       event_date: null as unknown as string,
+      event_end_date: null,
       location_name: null,
       address: [input.city, input.state].filter(Boolean).join(', '),
       city: clean(input.city, 100),
