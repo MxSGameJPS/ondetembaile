@@ -146,8 +146,26 @@ function sanitizeCandidateForReview(candidate: EventDiscoveryCandidate) {
   if (!candidate.event_date) return candidate
 
   const eventTime = new Date(candidate.event_date).getTime()
-  if (!Number.isNaN(eventTime) && eventTime < Date.now() - 6 * 60 * 60 * 1000) {
-    return { ...candidate, event_date: null, confidence: Math.min(candidate.confidence, 35) }
+  const endTime = candidate.event_end_date
+    ? new Date(candidate.event_end_date).getTime()
+    : null
+
+  if (endTime !== null && !Number.isNaN(endTime) && endTime < eventTime) {
+    return {
+      ...candidate,
+      event_end_date: null,
+      confidence: Math.min(candidate.confidence, 45),
+    }
+  }
+
+  const effectiveEnd = endTime !== null && !Number.isNaN(endTime) ? endTime : eventTime
+  if (!Number.isNaN(effectiveEnd) && effectiveEnd < Date.now() - 6 * 60 * 60 * 1000) {
+    return {
+      ...candidate,
+      event_date: null,
+      event_end_date: null,
+      confidence: Math.min(candidate.confidence, 35),
+    }
   }
 
   const metadata = candidateDateMetadata(candidate)
@@ -421,13 +439,17 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     if (!candidate.event_date) return false
 
     const eventTime = new Date(candidate.event_date).getTime()
+    const candidateEndTime = candidate.event_end_date
+      ? new Date(candidate.event_end_date).getTime()
+      : eventTime
     const startTime = new Date(startIso).getTime()
     const endTime = new Date(endIso).getTime()
 
     return (
       !Number.isNaN(eventTime) &&
-      eventTime >= startTime &&
-      eventTime <= endTime
+      !Number.isNaN(candidateEndTime) &&
+      eventTime <= endTime &&
+      candidateEndTime >= startTime
     )
   })
 
