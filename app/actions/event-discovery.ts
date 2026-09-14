@@ -652,7 +652,7 @@ export async function updateDiscoveryCandidateAction(
 
   const { data: existingCandidate, error: existingError } = await auth.supabase
     .from('event_candidates')
-    .select('source_type, raw_data')
+    .select('source_type, raw_data, event_date, event_end_date')
     .eq('id', candidateId)
     .eq('status', 'pending')
     .single()
@@ -714,6 +714,25 @@ export async function updateDiscoveryCandidateAction(
   const payload = Object.fromEntries(
     Object.entries(allowedUpdates).filter(([, value]) => value !== undefined)
   )
+
+  const nextStart = updates.event_date !== undefined
+    ? updates.event_date
+    : existingCandidate.event_date
+  const nextEnd = updates.event_end_date !== undefined
+    ? updates.event_end_date
+    : existingCandidate.event_end_date
+
+  if (nextStart && nextEnd) {
+    const startTime = new Date(nextStart).getTime()
+    const endTime = new Date(nextEnd).getTime()
+
+    if (Number.isNaN(startTime) || Number.isNaN(endTime) || endTime < startTime) {
+      return {
+        success: false as const,
+        error: 'A data final precisa ser igual ou posterior à data inicial.',
+      }
+    }
+  }
 
   const { data, error } = await auth.supabase
     .from('event_candidates')
