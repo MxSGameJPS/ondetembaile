@@ -35,6 +35,7 @@ export interface EventDiscoveryCandidate {
   title: string
   description: string | null
   event_date: string | null
+  event_end_date: string | null
   location_name: string | null
   address: string | null
   city: string
@@ -61,6 +62,7 @@ export interface UpdateDiscoveryCandidateInput {
   title?: string
   description?: string | null
   event_date?: string | null
+  event_end_date?: string | null
   location_name?: string | null
   address?: string | null
   city?: string
