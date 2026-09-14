@@ -29,6 +29,7 @@ export default function NewEventPage() {
     category_name: '',
     image_url: '',
     event_date: '',
+    event_end_date: '',
     ticket_price: '',
     whatsapp_info: '',
     facebook_url: '',
@@ -104,6 +105,14 @@ export default function NewEventPage() {
       return
     }
 
+    if (
+      formData.event_end_date &&
+      new Date(formData.event_end_date).getTime() < new Date(formData.event_date).getTime()
+    ) {
+      setError('A data final precisa ser igual ou posterior à data inicial.')
+      return
+    }
+
     setLoading(true)
     const result = await createEventAction({
       title: formData.title,
@@ -116,6 +125,7 @@ export default function NewEventPage() {
       category_name: formData.category_name,
       image_url: formData.image_url,
       event_date: formData.event_date,
+      event_end_date: formData.event_end_date,
       ticket_price: formData.ticket_price,
       whatsapp_info: formData.whatsapp_info,
       facebook_url: formData.facebook_url,
@@ -236,10 +246,10 @@ export default function NewEventPage() {
             </div>
           )}
 
-          {/* Data e Valor do Ingresso */}
+          {/* Período do evento */}
           <div className={styles.grid2}>
             <div className="form-group">
-              <label className="form-label">Data e Horário do Evento *</label>
+              <label className="form-label">Data e Horário de Início *</label>
               <input
                 type="datetime-local"
                 required
@@ -250,16 +260,27 @@ export default function NewEventPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Valor do Ingresso *</label>
+              <label className="form-label">Data e Horário de Término (Opcional)</label>
               <input
-                type="text"
-                required
-                placeholder="Ex: R$ 30,00 ou Entrada Gratuita"
+                type="datetime-local"
+                min={formData.event_date || undefined}
                 className="form-input"
-                value={formData.ticket_price}
-                onChange={(e) => setFormData({ ...formData, ticket_price: e.target.value })}
+                value={formData.event_end_date}
+                onChange={(e) => setFormData({ ...formData, event_end_date: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Valor do Ingresso *</label>
+            <input
+              type="text"
+              required
+              placeholder="Ex: R$ 30,00 ou Entrada Gratuita"
+              className="form-input"
+              value={formData.ticket_price}
+              onChange={(e) => setFormData({ ...formData, ticket_price: e.target.value })}
+            />
           </div>
 
           {/* WhatsApp para Informações */}
