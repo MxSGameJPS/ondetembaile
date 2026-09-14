@@ -29,6 +29,7 @@ create table if not exists public.event_candidates (
   title text not null,
   description text,
   event_date timestamptz,
+  event_end_date timestamptz,
   location_name text,
   address text,
   city text not null,
@@ -61,6 +62,9 @@ create index if not exists event_candidates_city_status_idx
 create index if not exists event_candidates_event_date_idx
   on public.event_candidates (event_date)
   where event_date is not null;
+
+alter table public.event_candidates
+  add column if not exists event_end_date timestamptz;
 
 alter table public.event_candidates
   drop constraint if exists event_candidates_source_type_check;
@@ -137,6 +141,7 @@ create policy "Admins can insert discovery API usage"
   with check ((select private.is_platform_admin()));
 
 alter table public.events
+  add column if not exists event_end_date timestamptz,
   add column if not exists origin text not null default 'producer',
   add column if not exists source_url text,
   add column if not exists source_domain text;
