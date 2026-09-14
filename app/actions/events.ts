@@ -17,6 +17,7 @@ export async function createEventAction(formData: {
   longitude?: number
   image_url: string
   event_date: string
+  event_end_date?: string
   ticket_price: string
   whatsapp_info: string
   facebook_url?: string
@@ -57,6 +58,7 @@ export async function createEventAction(formData: {
       longitude: formData.longitude || null,
       image_url: formData.image_url,
       event_date: formData.event_date,
+      event_end_date: formData.event_end_date || null,
       ticket_price: formData.ticket_price,
       whatsapp_info: formData.whatsapp_info,
       facebook_url: formData.facebook_url || null,
