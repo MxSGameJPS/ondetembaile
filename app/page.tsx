@@ -122,6 +122,9 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null)
+  const [eventCityCenters, setEventCityCenters] = useState<
+    Record<string, { lat: number; lng: number }>
+  >({})
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isMouseDown = useRef(false)
@@ -208,6 +211,78 @@ export default function HomePage() {
     }
   }, [searchCity, events])
 
+  useEffect(() => {
+    if (!searchCenter || searchCity.trim().length < 2 || events.length === 0) return
+
+    const missingCities = Array.from(
+      new Map(
+        events
+          .filter((event) => !validCoordinates(event.latitude, event.longitude))
+          .map((event) => {
+            const state = event.state || 'RS'
+            const key = `${normalizeCity(event.city)}|${state.toUpperCase()}`
+            return [key, { city: event.city, state }] as const
+          })
+      ).entries()
+    ).filter(([key]) => !eventCityCenters[key])
+
+    if (missingCities.length === 0) return
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    async function resolveMissingEventCities() {
+      const resolved: Record<string, { lat: number; lng: number }> = {}
+
+      for (const [key, location] of missingCities) {
+        if (cancelled) return
+
+        try {
+          const params = new URLSearchParams({
+            city: location.city,
+            state: location.state,
+          })
+
+          const response = await fetch(`/api/geocode?${params.toString()}`, {
+            signal: controller.signal,
+            cache: 'no-store',
+          })
+          const data = await response.json().catch(() => null)
+
+          if (
+            response.ok &&
+            data?.found === true &&
+            Number.isFinite(data.lat) &&
+            Number.isFinite(data.lng)
+          ) {
+            resolved[key] = { lat: data.lat, lng: data.lng }
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error(
+              `Não foi possível resolver a cidade do evento ${location.city}:`,
+              error
+            )
+          }
+        }
+      }
+
+      if (!cancelled && Object.keys(resolved).length > 0) {
+        setEventCityCenters((current) => ({
+          ...current,
+          ...resolved,
+        }))
+      }
+    }
+
+    resolveMissingEventCities()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [searchCenter, searchCity, events, eventCityCenters])
+
   // Desktop Scroll Handlers
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     if (scrollContainerRef.current && e.deltaY !== 0) {
@@ -257,14 +332,18 @@ export default function HomePage() {
     const directCityMatch =
       cityQuery === '' || normalizeCity(e.city).includes(cityQuery)
 
+    const eventCityKey = `${normalizeCity(e.city)}|${(e.state || 'RS').toUpperCase()}`
+    const fallbackCityCenter = eventCityCenters[eventCityKey]
+    const eventCoordinates = validCoordinates(e.latitude, e.longitude)
+      ? {
+          lat: Number(e.latitude),
+          lng: Number(e.longitude),
+        }
+      : fallbackCityCenter
+
     const matchesRadius =
-      cityQuery !== '' &&
-      searchCenter &&
-      validCoordinates(e.latitude, e.longitude)
-        ? distanceKm(searchCenter, {
-            lat: Number(e.latitude),
-            lng: Number(e.longitude),
-          }) <= SEARCH_RADIUS_KM
+      cityQuery !== '' && searchCenter && eventCoordinates
+        ? distanceKm(searchCenter, eventCoordinates) <= SEARCH_RADIUS_KM
         : false
 
     if (!directCityMatch && !matchesRadius) return false
