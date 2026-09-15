@@ -163,12 +163,16 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
               >
                 <ExternalLink size={20} />
-                <span>Ver fonte original do evento</span>
+                <span>Ver publicação original</span>
               </a>
             ) : null}
 
             {/* Event Networks / Producer Info */}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+              <p style={{ fontSize: '0.78rem', color: '#9ca3af', lineHeight: '1.45', marginBottom: '1rem' }}>
+                As informações aqui listadas são extraídas da publicação original, o <strong style={{ color: '#e5e7eb', fontWeight: 'bold' }}>Aondetembaile.com.br</strong> é apenas um meio para facilitar a busca e pesquisa do conteúdo.
+              </p>
+
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.75rem' }}>
                 Redes Sociais do Evento
               </div>
@@ -182,7 +186,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                     className={styles.socialBtn}
                   >
                     <ExternalLink size={16} color="#f97316" />
-                    <span>Fonte original</span>
+                    <span>Ver publicação original</span>
                   </a>
                 )}
 
