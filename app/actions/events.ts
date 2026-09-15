@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { sendEventSubmittedEmail, sendEventStatusEmail } from '@/lib/resend/emails'
 import { revalidatePath } from 'next/cache'
+import { geocodeLocation } from '@/lib/geocoding/server'
 
 export async function createEventAction(formData: {
   title: string
@@ -18,7 +19,7 @@ export async function createEventAction(formData: {
   image_url: string
   event_date: string
   event_end_date?: string
-  ticket_price: string
+  ticket_price?: string
   whatsapp_info: string
   facebook_url?: string
   instagram_handle?: string
@@ -55,6 +56,25 @@ export async function createEventAction(formData: {
     return { success: false, error: 'A data final precisa ser igual ou posterior à data inicial.' }
   }
 
+  let latitude = formData.latitude
+  let longitude = formData.longitude
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    try {
+      const geocoded = await geocodeLocation({
+        address: formData.address,
+        locationName: formData.location_name,
+        city: formData.city,
+        state: formData.state,
+      })
+
+      latitude = geocoded?.lat
+      longitude = geocoded?.lng
+    } catch (error) {
+      console.error('Evento será salvo sem coordenadas automáticas:', error)
+    }
+  }
+
   const { data: event, error: insertError } = await supabase
     .from('events')
     .insert({
@@ -67,12 +87,12 @@ export async function createEventAction(formData: {
       address: formData.address,
       city: formData.city,
       state: formData.state || null,
-      latitude: formData.latitude || null,
-      longitude: formData.longitude || null,
+      latitude: Number.isFinite(latitude) ? latitude : null,
+      longitude: Number.isFinite(longitude) ? longitude : null,
       image_url: formData.image_url,
       event_date: formData.event_date,
       event_end_date: formData.event_end_date || null,
-      ticket_price: formData.ticket_price,
+      ticket_price: formData.ticket_price || 'Consultar',
       whatsapp_info: formData.whatsapp_info,
       facebook_url: formData.facebook_url || null,
       instagram_handle: formData.instagram_handle || null,

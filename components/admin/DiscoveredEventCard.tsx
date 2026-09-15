@@ -259,15 +259,7 @@ export default function DiscoveredEventCard({
             />
           </label>
 
-          <label className={styles.field}>
-            <span>Ingresso</span>
-            <input
-              value={draft.ticket_price}
-              placeholder="Consultar"
-              onChange={(event) => setDraft({ ...draft, ticket_price: event.target.value })}
-              disabled={busy}
-            />
-          </label>
+          {/* Valor do ingresso temporariamente oculto; mantido no modelo para uso futuro. */}
 
           <label className={`${styles.field} ${styles.full}`}>
             <span>Endereço</span>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, MapPin, Ticket, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
+import { Calendar, MapPin, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import styles from './EventCard.module.css'
 
 export interface EventItem {
@@ -12,6 +12,8 @@ export interface EventItem {
   address: string
   city: string
   state?: string | null
+  latitude?: number | null
+  longitude?: number | null
   category_id?: string | null
   category_name?: string | null
   image_url: string
@@ -74,12 +76,6 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
         <div className={styles.cityBadge}>
           <MapPin size={12} />
           <span>{event.city}{event.state ? `, ${event.state}` : ''}</span>
-        </div>
-
-        {/* Price Tag */}
-        <div className={styles.priceTag}>
-          <Ticket size={12} />
-          <span>{event.ticket_price}</span>
         </div>
 
         {/* Category Tag if present */}

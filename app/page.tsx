@@ -14,6 +14,57 @@ interface Category {
   slug: string
 }
 
+const HERO_IMAGES = [
+  '/img_hero/carousel/hero-1.svg',
+  '/img_hero/carousel/hero-2.svg',
+  '/img_hero/carousel/hero-3.svg',
+  '/img_hero/carousel/hero-4.svg',
+  '/img_hero/carousel/hero-5.svg',
+]
+
+const SEARCH_RADIUS_KM = 20
+const LEGACY_BRAZIL_CENTER = { lat: -14.235, lng: -51.9253 }
+
+function normalizeCity(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function validCoordinates(latitude?: number | null, longitude?: number | null) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false
+
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false
+
+  return !(
+    Math.abs(lat - LEGACY_BRAZIL_CENTER.lat) < 0.0001 &&
+    Math.abs(lng - LEGACY_BRAZIL_CENTER.lng) < 0.0001
+  )
+}
+
+function distanceKm(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+) {
+  const earthRadiusKm = 6371
+  const radians = (degrees: number) => (degrees * Math.PI) / 180
+  const deltaLat = radians(to.lat - from.lat)
+  const deltaLng = radians(to.lng - from.lng)
+  const lat1 = radians(from.lat)
+  const lat2 = radians(to.lat)
+
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 // Demo events fallback in case DB is newly created
 const DEMO_EVENTS: EventItem[] = [
   {
@@ -70,6 +121,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isMouseDown = useRef(false)
@@ -105,6 +157,56 @@ export default function HomePage() {
 
     loadData()
   }, [])
+
+  useEffect(() => {
+    const cityQuery = searchCity.trim()
+
+    if (cityQuery.length < 2) {
+      setSearchCenter(null)
+      return
+    }
+
+    const exactCityEvent = events.find(
+      (event) => normalizeCity(event.city) === normalizeCity(cityQuery)
+    )
+    const state = exactCityEvent?.state || 'RS'
+    const controller = new AbortController()
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          city: cityQuery,
+          state,
+        })
+        const response = await fetch(`/api/geocode?${params.toString()}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+        const data = await response.json().catch(() => null)
+
+        if (
+          response.ok &&
+          data?.found === true &&
+          Number.isFinite(data.lat) &&
+          Number.isFinite(data.lng)
+        ) {
+          setSearchCenter({ lat: data.lat, lng: data.lng })
+        } else {
+          setSearchCenter(null)
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Não foi possível resolver a cidade pesquisada:', error)
+          setSearchCenter(null)
+        }
+      }
+    }, 450)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [searchCity, events])
 
   // Desktop Scroll Handlers
   const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -151,8 +253,21 @@ export default function HomePage() {
 
   // Filter events by City search, Category & Period
   const filteredEvents = events.filter((e) => {
-    const matchesCity = searchCity.trim() === '' || e.city.toLowerCase().includes(searchCity.toLowerCase().trim())
-    if (!matchesCity) return false
+    const cityQuery = normalizeCity(searchCity)
+    const directCityMatch =
+      cityQuery === '' || normalizeCity(e.city).includes(cityQuery)
+
+    const matchesRadius =
+      cityQuery !== '' &&
+      searchCenter &&
+      validCoordinates(e.latitude, e.longitude)
+        ? distanceKm(searchCenter, {
+            lat: Number(e.latitude),
+            lng: Number(e.longitude),
+          }) <= SEARCH_RADIUS_KM
+        : false
+
+    if (!directCityMatch && !matchesRadius) return false
 
     const matchesCategory =
       selectedCategory === 'all' ||
@@ -196,8 +311,18 @@ export default function HomePage() {
     <div>
       {/* Hero Section */}
       <section className={styles.hero}>
-        {/* Layer 0: Background image with subtle cinematic zoom */}
-        <div className={styles.heroBgImage} />
+        {/* Layer 0: Infinite carousel of traditional Rio Grande do Sul baile scenes */}
+        <div className={styles.heroCarousel} aria-hidden="true">
+          <div className={styles.heroCarouselTrack}>
+            {[...HERO_IMAGES, HERO_IMAGES[0]].map((image, index) => (
+              <div
+                key={`${image}-${index}`}
+                className={styles.heroCarouselSlide}
+                style={{ backgroundImage: `url('${image}')` }}
+              />
+            ))}
+          </div>
+        </div>
 
         {/* Layer 1: Ambient nightclub lights — no strobe/flashing */}
         <div className={styles.clubLights} aria-hidden="true">
@@ -276,9 +401,9 @@ export default function HomePage() {
             <div>
               <h2 className={styles.sectionTitle}>
                 {searchCity.trim() && selectedCategory !== 'all'
-                  ? `Eventos de ${activeCategoryName} em "${searchCity}"`
+                  ? `Eventos de ${activeCategoryName} em "${searchCity}" e até ${SEARCH_RADIUS_KM} km`
                   : searchCity.trim()
-                  ? `Eventos em "${searchCity}"`
+                  ? `Eventos em "${searchCity}" e até ${SEARCH_RADIUS_KM} km`
                   : selectedCategory !== 'all'
                   ? `Eventos de ${activeCategoryName}`
                   : 'Próximos Eventos'}

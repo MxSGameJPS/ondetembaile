@@ -30,7 +30,7 @@ export default function NewEventPage() {
     image_url: '',
     event_date: '',
     event_end_date: '',
-    ticket_price: '',
+    ticket_price: 'Consultar',
     whatsapp_info: '',
     facebook_url: '',
     instagram_handle: '',
@@ -126,7 +126,7 @@ export default function NewEventPage() {
       image_url: formData.image_url,
       event_date: formData.event_date,
       event_end_date: formData.event_end_date,
-      ticket_price: formData.ticket_price,
+      ticket_price: 'Consultar',
       whatsapp_info: formData.whatsapp_info,
       facebook_url: formData.facebook_url,
       instagram_handle: formData.instagram_handle,
@@ -276,17 +276,8 @@ export default function NewEventPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Valor do Ingresso *</label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: R$ 30,00 ou Entrada Gratuita"
-              className="form-input"
-              value={formData.ticket_price}
-              onChange={(e) => setFormData({ ...formData, ticket_price: e.target.value })}
-            />
-          </div>
+          {/* Valor do ingresso temporariamente desativado.
+              O campo permanece no banco para uma funcionalidade futura. */}
 
           {/* WhatsApp para Informações */}
           <div className="form-group">

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import EventMap from '@/components/EventMap'
 import SocialShare from '@/components/SocialShare'
-import { Calendar, MapPin, Ticket, MessageCircle, ArrowLeft, Globe, Share2, ExternalLink } from 'lucide-react'
+import { Calendar, MapPin, MessageCircle, ArrowLeft, Globe, Share2, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import styles from './page.module.css'
@@ -106,10 +106,6 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             <span>{event.city}{event.state ? `, ${event.state}` : ''}</span>
           </div>
 
-          <div className={styles.metaBadge} style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#030712' }}>
-            <Ticket size={16} />
-            <span>{event.ticket_price}</span>
-          </div>
         </div>
       </div>
 
@@ -146,12 +142,6 @@ export default async function EventDetailPage({ params }: EventPageProps) {
         <div>
           <div className={styles.sidebarCard}>
             
-            {/* Ticket Price Box */}
-            <div className={styles.ticketBox}>
-              <div className={styles.ticketLabel}>Valor do Ingresso</div>
-              <div className={styles.ticketValue}>{event.ticket_price}</div>
-            </div>
-
             {/* Contact / original source action */}
             {whatsappUrl ? (
               <a

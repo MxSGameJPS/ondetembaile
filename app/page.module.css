@@ -12,18 +12,46 @@
   isolation: isolate;
 }
 
-/* Background image with a subtle, premium cinematic zoom */
-.heroBgImage {
+/* Infinite hero carousel using local, generated gaucho baile imagery */
+.heroCarousel {
   position: absolute;
-  inset: -4%;
-  background-color: #080808;
-  background-image: url('/img_hero/image.png');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  filter: brightness(0.35) contrast(1.12) saturate(1.1);
-  animation: heroCinematicZoom 28s infinite alternate ease-in-out;
+  inset: 0;
   z-index: 0;
+  overflow: hidden;
+  background: #080808;
+}
+
+.heroCarouselTrack {
+  display: flex;
+  width: 600%;
+  height: 100%;
+  animation: heroCarouselInfinite 34s infinite ease-in-out;
+  will-change: transform;
+}
+
+.heroCarouselSlide {
+  flex: 0 0 16.666666%;
+  height: 100%;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: brightness(0.34) contrast(1.12) saturate(1.08);
+  transform: scale(1.015);
+}
+
+@keyframes heroCarouselInfinite {
+  0%, 15% { transform: translateX(0); }
+  20%, 35% { transform: translateX(-16.666666%); }
+  40%, 55% { transform: translateX(-33.333333%); }
+  60%, 75% { transform: translateX(-50%); }
+  80%, 95% { transform: translateX(-66.666666%); }
+  100% { transform: translateX(-83.333333%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroCarouselTrack {
+    animation: none;
+  }
 }
 
 /* Dark gradient overlay + vignette to preserve legibility */

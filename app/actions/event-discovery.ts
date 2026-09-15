@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { geocodeLocation } from '@/lib/geocoding/server'
 import { requireAdmin } from '@/lib/auth/admin'
 import {
   APIFY_ESTIMATED_COST_PER_ITEM_USD,
@@ -851,6 +852,19 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
     }
   }
 
+  let geocodedLocation: { lat: number; lng: number } | null = null
+
+  try {
+    geocodedLocation = await geocodeLocation({
+      address: candidate.address || '',
+      locationName: candidate.location_name || '',
+      city: candidate.city,
+      state: candidate.state || '',
+    })
+  } catch (error) {
+    console.error('Candidato será publicado sem coordenadas automáticas:', error)
+  }
+
   const { data: createdEvent, error: insertError } = await auth.supabase
     .from('events')
     .insert({
@@ -863,6 +877,8 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
       address: candidate.address || [candidate.city, candidate.state].filter(Boolean).join(', '),
       city: candidate.city,
       state: candidate.state || null,
+      latitude: geocodedLocation?.lat ?? null,
+      longitude: geocodedLocation?.lng ?? null,
       image_url: candidate.image_url || '/img_hero/image.png',
       event_date: candidate.event_date,
       event_end_date: candidate.event_end_date || null,
