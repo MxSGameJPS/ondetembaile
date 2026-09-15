@@ -574,7 +574,7 @@ export default function HomePage() {
                 </button>
                 <Link href="/cadastro" className="btn-primary">
                   <PlusCircle size={18} />
-                  Cadastrar Evento
+                  Cadastre seu evento gratuitamente!
                 </Link>
               </div>
             </div>

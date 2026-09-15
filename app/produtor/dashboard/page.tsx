@@ -3,15 +3,20 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
-import { PlusCircle, Sparkles, AlertCircle, Calendar } from 'lucide-react'
+import EditEventModal from '@/components/admin/EditEventModal'
+import { PlusCircle, Sparkles, AlertCircle, Calendar, Edit3 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { deleteEventAction } from '@/app/actions/events'
+import { getCategoriesAction } from '@/app/actions/categories'
 
 export default function ProducerDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [events, setEvents] = useState<EventItem[]>([])
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -34,6 +39,12 @@ export default function ProducerDashboard() {
 
       setProfile(profileData)
 
+      // Load Categories
+      const catRes = await getCategoriesAction()
+      if (catRes.success && catRes.data) {
+        setCategories(catRes.data)
+      }
+
       // Load Producer's Events
       const { data: eventsData, error } = await supabase
         .from('events')
@@ -49,6 +60,16 @@ export default function ProducerDashboard() {
 
     loadProducerData()
   }, [])
+
+  const handleEditEvent = (eventItem: EventItem) => {
+    setEditingEvent(eventItem)
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveEventSuccess = (updatedEvent: EventItem) => {
+    setEvents((current) => current.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)))
+    alert('Evento atualizado com sucesso!')
+  }
 
   const handleDeleteEvent = async (eventId: string) => {
     if (confirm('Tem certeza que deseja excluir este evento?')) {
@@ -127,7 +148,16 @@ export default function ProducerDashboard() {
               event={event}
               showStatus={true}
               adminActions={
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', width: '100%' }}>
+                  <button
+                    onClick={() => handleEditEvent(event)}
+                    className="btn-primary"
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', gap: '0.3rem', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Edit3 size={14} />
+                    <span>Editar</span>
+                  </button>
+
                   <button
                     onClick={() => handleDeleteEvent(event.id)}
                     className="btn-danger"
@@ -163,6 +193,16 @@ export default function ProducerDashboard() {
           </Link>
         </div>
       )}
+
+      {/* Edit Event Modal */}
+      <EditEventModal
+        event={editingEvent}
+        categories={categories}
+        isOpen={isEditModalOpen}
+        isAdminView={false}
+        onClose={() => setIsEditModalOpen(false)}
+        onSaveSuccess={handleSaveEventSuccess}
+      />
     </div>
   )
 }

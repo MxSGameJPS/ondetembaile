@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import EventCard, { EventItem } from '@/components/EventCard'
 import DiscoveredEventCard from '@/components/admin/DiscoveredEventCard'
-import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2, Ticket, Sparkles } from 'lucide-react'
+import { ShieldCheck, CheckCircle2, XCircle, Trash2, Users, Calendar, AlertOctagon, Tag, PlusCircle, Search, Globe2, MessageCircle, Share2, Link2, Ticket, Sparkles, Edit3 } from 'lucide-react'
+import EditEventModal from '@/components/admin/EditEventModal'
 import { updateEventStatusAction, deleteEventAction } from '@/app/actions/events'
 import { updateUserStatusAction } from '@/app/actions/users'
 import { getCategoriesAction, createCategoryAction, deleteCategoryAction } from '@/app/actions/categories'
@@ -50,6 +51,8 @@ export default function AdminDashboardPage() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [profiles, setProfiles] = useState<ProfileItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [candidateEvents, setCandidateEvents] = useState<EventDiscoveryCandidate[]>([])
   const [discoverCity, setDiscoverCity] = useState('')
   const [discoverState, setDiscoverState] = useState('RS')
@@ -378,6 +381,17 @@ export default function AdminDashboardPage() {
     }
   }
 
+  // Edit Event Handler (SuperAdmin / Admin)
+  const handleEditEvent = (eventItem: EventItem) => {
+    setEditingEvent(eventItem)
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveEventSuccess = (updatedEvent: EventItem) => {
+    setEvents((current) => current.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)))
+    alert('Evento atualizado com sucesso por administrador!')
+  }
+
   // Event Approval / Rejection Handler
   const handleApprove = async (eventId: string) => {
     const res = await updateEventStatusAction(eventId, 'approved')
@@ -526,22 +540,32 @@ export default function AdminDashboardPage() {
                   event={event}
                   showStatus={true}
                   adminActions={
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => handleEditEvent(event)}
+                        className="btn-primary"
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', gap: '0.3rem', display: 'flex', alignItems: 'center' }}
+                        title="Editar detalhes do evento"
+                      >
+                        <Edit3 size={14} />
+                        <span>Editar</span>
+                      </button>
+
                       <button
                         onClick={() => handleApprove(event.id)}
                         className="btn-success"
-                        style={{ flex: 1, padding: '0.5rem' }}
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}
                       >
-                        <CheckCircle2 size={16} />
+                        <CheckCircle2 size={14} />
                         <span>Aprovar</span>
                       </button>
 
                       <button
                         onClick={() => handleReject(event.id)}
                         className="btn-danger"
-                        style={{ flex: 1, padding: '0.5rem' }}
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}
                       >
-                        <XCircle size={16} />
+                        <XCircle size={14} />
                         <span>Recusar</span>
                       </button>
                     </div>
@@ -966,12 +990,22 @@ export default function AdminDashboardPage() {
               event={event}
               showStatus={true}
               adminActions={
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleEditEvent(event)}
+                    className="btn-primary"
+                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', gap: '0.3rem', display: 'flex', alignItems: 'center' }}
+                    title="Editar detalhes do evento"
+                  >
+                    <Edit3 size={14} />
+                    <span>Editar</span>
+                  </button>
+
                   {event.status !== 'approved' && (
                     <button
                       onClick={() => handleApprove(event.id)}
                       className="btn-success"
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}
                     >
                       Aprovar
                     </button>
@@ -980,7 +1014,7 @@ export default function AdminDashboardPage() {
                     <button
                       onClick={() => handleReject(event.id)}
                       className="btn-danger"
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}
                     >
                       Recusar
                     </button>
@@ -988,7 +1022,7 @@ export default function AdminDashboardPage() {
                   <button
                     onClick={() => handleDelete(event.id)}
                     className="btn-outline"
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', color: '#ef4444' }}
+                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: '#ef4444' }}
                   >
                     Excluir
                   </button>
@@ -998,6 +1032,16 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       )}
+
+      {/* Edit Event Modal for Admin / SuperAdmin */}
+      <EditEventModal
+        event={editingEvent}
+        categories={categories}
+        isOpen={isEditModalOpen}
+        isAdminView={true}
+        onClose={() => setIsEditModalOpen(false)}
+        onSaveSuccess={handleSaveEventSuccess}
+      />
     </div>
   )
 }

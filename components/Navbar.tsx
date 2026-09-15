@@ -106,7 +106,7 @@ export default function Navbar() {
               </Link>
 
               <Link href="/cadastro" className="btn-primary">
-                Cadastre seu evento!
+                Cadastre seu evento gratuitamente!
               </Link>
             </>
           )}
@@ -184,7 +184,7 @@ export default function Navbar() {
                 className="btn-primary"
                 style={{ width: '100%' }}
               >
-                Cadastre seu evento!
+                Cadastre seu evento gratuitamente!
               </Link>
             </>
           )}

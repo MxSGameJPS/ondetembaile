@@ -1,5 +1,6 @@
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -33,7 +34,12 @@ export default function RootLayout({
             <p style={{ color: '#d1d5db', fontWeight: 'bold', marginBottom: '0.5rem' }}>
               🪩 Aonde Tem Baile — O portal de eventos regionais do Brasil
             </p>
-            <p>© {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.</p>
+            <p>
+              © {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados. |{' '}
+              <Link href="/termos-de-uso" style={{ color: '#f59e0b', textDecoration: 'none' }}>
+                Termos de Uso e Privacidade
+              </Link>
+            </p>
           </div>
         </footer>
       </body>

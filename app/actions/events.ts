@@ -116,6 +116,137 @@ export async function createEventAction(formData: {
   return { success: true, event }
 }
 
+export async function updateEventAction(
+  eventId: string,
+  formData: {
+    title: string
+    description: string
+    location_name?: string
+    address: string
+    city: string
+    state?: string
+    category_id?: string
+    category_name?: string
+    latitude?: number
+    longitude?: number
+    image_url: string
+    event_date: string
+    event_end_date?: string
+    ticket_price?: string
+    whatsapp_info: string
+    facebook_url?: string
+    instagram_handle?: string
+    status?: 'pending' | 'approved' | 'rejected'
+  }
+) {
+  const supabase = await createClient()
+
+  // Verify auth
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    return { success: false, error: 'Usuário não autenticado.' }
+  }
+
+  // Get user profile role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile && ['admin', 'superadmin'].includes(profile.role)
+
+  // Verify event existence and ownership if not admin
+  const { data: existingEvent } = await supabase
+    .from('events')
+    .select('producer_id')
+    .eq('id', eventId)
+    .single()
+
+  if (!existingEvent) {
+    return { success: false, error: 'Evento não encontrado.' }
+  }
+
+  if (!isAdmin && existingEvent.producer_id !== user.id) {
+    return { success: false, error: 'Apenas administradores ou o criador do evento podem editá-lo.' }
+  }
+
+  const startTime = new Date(formData.event_date).getTime()
+  const endTime = formData.event_end_date
+    ? new Date(formData.event_end_date).getTime()
+    : null
+
+  if (Number.isNaN(startTime)) {
+    return { success: false, error: 'Informe uma data inicial válida.' }
+  }
+
+  if (endTime !== null && (Number.isNaN(endTime) || endTime < startTime)) {
+    return { success: false, error: 'A data final precisa ser igual ou posterior à data inicial.' }
+  }
+
+  let latitude = formData.latitude
+  let longitude = formData.longitude
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    try {
+      const geocoded = await geocodeLocation({
+        address: formData.address,
+        locationName: formData.location_name,
+        city: formData.city,
+        state: formData.state,
+      })
+
+      latitude = geocoded?.lat
+      longitude = geocoded?.lng
+    } catch (error) {
+      console.error('Coordenadas não puderam ser recalculadas:', error)
+    }
+  }
+
+  const updateData: Record<string, any> = {
+    title: formData.title,
+    description: formData.description,
+    location_name: formData.location_name || null,
+    address: formData.address,
+    city: formData.city,
+    state: formData.state || null,
+    category_id: formData.category_id || null,
+    category_name: formData.category_name || null,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+    image_url: formData.image_url,
+    event_date: formData.event_date,
+    event_end_date: formData.event_end_date || null,
+    ticket_price: formData.ticket_price || 'Consultar',
+    whatsapp_info: formData.whatsapp_info,
+    facebook_url: formData.facebook_url || null,
+    instagram_handle: formData.instagram_handle || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (isAdmin && formData.status) {
+    updateData.status = formData.status
+  }
+
+  const { data: updatedEvent, error: updateError } = await supabase
+    .from('events')
+    .update(updateData)
+    .eq('id', eventId)
+    .select()
+    .single()
+
+  if (updateError) {
+    console.error('Erro ao atualizar evento:', updateError)
+    return { success: false, error: updateError.message }
+  }
+
+  revalidatePath('/admin/dashboard')
+  revalidatePath('/produtor/dashboard')
+  revalidatePath('/')
+  revalidatePath(`/evento/${eventId}`)
+  return { success: true, event: updatedEvent }
+}
+
 export async function updateEventStatusAction(
   eventId: string,
   status: 'approved' | 'rejected',

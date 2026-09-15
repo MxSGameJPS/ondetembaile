@@ -24,6 +24,8 @@ export interface EventItem {
   source_url?: string | null
   source_domain?: string | null
   origin?: 'producer' | 'admin' | 'discovered'
+  facebook_url?: string | null
+  instagram_handle?: string | null
   status?: string
   rejection_reason?: string | null
 }
