@@ -15,11 +15,11 @@ interface Category {
 }
 
 const HERO_IMAGES = [
-  '/img_hero/carousel/hero-1.svg',
-  '/img_hero/carousel/hero-2.svg',
-  '/img_hero/carousel/hero-3.svg',
-  '/img_hero/carousel/hero-4.svg',
-  '/img_hero/carousel/hero-5.svg',
+  '/img_hero/carousel/image.png',
+  '/img_hero/carousel/image-2.png',
+  '/img_hero/carousel/image-3.png',
+  '/img_hero/carousel/image-4.png',
+  '/img_hero/carousel/image-5.png',
 ]
 
 const SEARCH_RADIUS_KM = 20
