@@ -470,7 +470,7 @@ export default function HomePage() {
                   alt=""
                   fill
                   sizes="100vw"
-                  priority={index === 0}
+                  preload={index === 0}
                   className={styles.heroCarouselImage}
                 />
               </div>
