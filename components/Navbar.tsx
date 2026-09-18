@@ -75,6 +75,14 @@ export default function Navbar() {
             Explorar Eventos
           </Link>
 
+          <Link href="/quemsomos" className={styles.navLink}>
+            Quem somos
+          </Link>
+
+          <Link href="/contato-e-suporte" className={styles.navLink}>
+            Suporte
+          </Link>
+
           {user ? (
             <>
               <Link href="/produtor/novo-evento" className="btn-primary">
@@ -127,6 +135,14 @@ export default function Navbar() {
         <div className={styles.mobileDropdown}>
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className={styles.navLink}>
             Explorar Eventos
+          </Link>
+
+          <Link href="/quemsomos" onClick={() => setMobileMenuOpen(false)} className={styles.navLink}>
+            Quem somos
+          </Link>
+
+          <Link href="/contato-e-suporte" onClick={() => setMobileMenuOpen(false)} className={styles.navLink}>
+            Contato e Suporte
           </Link>
 
           {user ? (
