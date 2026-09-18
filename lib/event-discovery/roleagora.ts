@@ -2,6 +2,8 @@ import type { GroqEventCandidate } from '@/lib/event-discovery/groq'
 
 const ROLE_AGORA_BASE_URL = 'https://www.roleagora.com.br'
 const FETCH_TIMEOUT_MS = 20000
+const MAX_EVENT_PAGES_PER_CITY = 40
+const EVENT_PAGE_CONCURRENCY = 6
 
 interface RoleAgoraLocation {
   name?: string | null
@@ -89,6 +91,195 @@ function parseNextData(html: string) {
   } catch {
     throw new Error('O __NEXT_DATA__ do Rolê Agora retornou JSON inválido.')
   }
+}
+
+
+function tryParseNextData(html: string) {
+  try {
+    return parseNextData(html)
+  } catch {
+    return null
+  }
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/gi, '&')
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#47;/gi, '/')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+function extractEventLinks(html: string) {
+  const links = new Set<string>()
+  const patterns = [
+    /href=["'](\/event\/[^"'?#<>\s]+)["']/gi,
+    /href=["'](https?:\/\/www\.roleagora\.com\.br\/event\/[^"'?#<>\s]+)["']/gi,
+  ]
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(html)) !== null) {
+      const raw = decodeHtmlEntities(match[1] || '')
+      if (!raw) continue
+
+      try {
+        const url = new URL(raw, ROLE_AGORA_BASE_URL)
+        if (url.hostname !== 'www.roleagora.com.br') continue
+        if (!url.pathname.startsWith('/event/')) continue
+        url.hash = ''
+        url.search = ''
+        links.add(url.toString())
+      } catch {
+        // Ignora links inválidos.
+      }
+    }
+  }
+
+  return Array.from(links).slice(0, MAX_EVENT_PAGES_PER_CITY)
+}
+
+function collectJsonLdEvents(value: unknown, output: Record<string, unknown>[]) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectJsonLdEvents(item, output))
+    return
+  }
+
+  if (!value || typeof value !== 'object') return
+
+  const record = value as Record<string, unknown>
+  const type = record['@type']
+  const types = Array.isArray(type) ? type : [type]
+
+  if (
+    types.some(
+      (item) => typeof item === 'string' && item.toLowerCase() === 'event'
+    )
+  ) {
+    output.push(record)
+  }
+
+  if (record['@graph']) {
+    collectJsonLdEvents(record['@graph'], output)
+  }
+}
+
+function extractJsonLdEvent(html: string) {
+  const regex =
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  const events: Record<string, unknown>[] = []
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(html)) !== null) {
+    const raw = match[1]?.trim()
+    if (!raw) continue
+
+    try {
+      collectJsonLdEvents(JSON.parse(raw), events)
+    } catch {
+      // Continua tentando os demais blocos JSON-LD.
+    }
+  }
+
+  return events[0] || null
+}
+
+function jsonLdImage(value: unknown) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value.find((item) => typeof item === 'string') as string | undefined
+  }
+  if (value && typeof value === 'object') {
+    const url = (value as Record<string, unknown>).url
+    return typeof url === 'string' ? url : undefined
+  }
+  return undefined
+}
+
+function roleAgoraEventFromJsonLd(
+  value: Record<string, unknown>,
+  sourceUrl: string
+): RoleAgoraEvent | null {
+  const startsAt = clean(value.startDate, 80)
+  if (!startsAt) return null
+
+  const location =
+    value.location && typeof value.location === 'object'
+      ? (value.location as Record<string, unknown>)
+      : {}
+  const addressValue =
+    location.address && typeof location.address === 'object'
+      ? (location.address as Record<string, unknown>)
+      : {}
+
+  const sourceSlug = (() => {
+    try {
+      const url = new URL(sourceUrl)
+      return url.pathname.split('/event/')[1] || ''
+    } catch {
+      return ''
+    }
+  })()
+
+  return {
+    slug: sourceSlug,
+    name: clean(value.name, 240),
+    description: clean(value.description, 1600),
+    startsAt,
+    endsAt: clean(value.endDate, 80) || null,
+    backgroundImageUrl: clean(jsonLdImage(value.image), 1000) || null,
+    location: {
+      name: clean(location.name, 180) || null,
+      address: [
+        clean(addressValue.streetAddress, 180),
+        clean(addressValue.addressLocality, 120),
+        clean(addressValue.addressRegion, 30),
+      ]
+        .filter(Boolean)
+        .join(', '),
+      addressStreet: clean(addressValue.streetAddress, 180) || null,
+      addressCity: clean(addressValue.addressLocality, 120) || null,
+      addressState: clean(addressValue.addressRegion, 30) || null,
+    },
+  }
+}
+
+function extractEventFromEventPage(html: string, sourceUrl: string) {
+  const nextData = tryParseNextData(html)
+  if (nextData) {
+    const events: RoleAgoraEvent[] = []
+    collectEvents(nextData, events)
+    if (events[0]) return events[0]
+  }
+
+  const jsonLd = extractJsonLdEvent(html)
+  return jsonLd ? roleAgoraEventFromJsonLd(jsonLd, sourceUrl) : null
+}
+
+async function fetchEventPages(eventUrls: string[]) {
+  const events: RoleAgoraEvent[] = []
+
+  for (let index = 0; index < eventUrls.length; index += EVENT_PAGE_CONCURRENCY) {
+    const batch = eventUrls.slice(index, index + EVENT_PAGE_CONCURRENCY)
+    const results = await Promise.all(
+      batch.map(async (url) => {
+        try {
+          const html = await fetchText(url)
+          return extractEventFromEventPage(html, url)
+        } catch (error) {
+          console.error('Erro ao ler evento do Rolê Agora:', url, error)
+          return null
+        }
+      })
+    )
+
+    for (const event of results) {
+      if (event) events.push(event)
+    }
+  }
+
+  return events
 }
 
 function isRoleAgoraEvent(value: unknown): value is RoleAgoraEvent {
@@ -361,6 +552,15 @@ export async function discoverRoleAgoraEvents(input: {
   const rawEvents: RoleAgoraEvent[] = []
   payloads.forEach((payload) => collectEvents(payload, rawEvents))
 
+  const eventLinks = extractEventLinks(html)
+  let usedHtmlEventPages = false
+
+  if (eventLinks.length > 0) {
+    const detailedEvents = await fetchEventPages(eventLinks)
+    rawEvents.push(...detailedEvents)
+    usedHtmlEventPages = detailedEvents.length > 0
+  }
+
   const uniqueRaw = new Map<string, RoleAgoraEvent>()
   for (const event of rawEvents) {
     const key = clean(event.id, 160) || clean(event.slug, 600)
@@ -390,6 +590,8 @@ export async function discoverRoleAgoraEvents(input: {
     pageUrl,
     buildId: buildId || null,
     usedDataEndpoint,
+    usedHtmlEventPages,
+    eventLinksFound: eventLinks.length,
     warnings:
       candidates.length === 0
         ? [
