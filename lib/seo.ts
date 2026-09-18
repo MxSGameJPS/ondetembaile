@@ -129,11 +129,11 @@ export async function getFutureApprovedEvents(input?: {
     const { data, error } = await query
 
     if (error) {
-      console.error('SEO: não foi possível carregar eventos futuros:', error)
+      console.error('SEO: nÃ£o foi possÃ­vel carregar eventos futuros:', error)
       break
     }
 
-    const batch = (data || []) as SeoEvent[]
+    const batch = (data || []) as unknown as SeoEvent[]
     events.push(...batch)
 
     if (batch.length < batchSize) break
@@ -153,7 +153,7 @@ export async function getSeoCategories() {
     .limit(500)
 
   if (error) {
-    console.error('SEO: não foi possível carregar categorias:', error)
+    console.error('SEO: nÃ£o foi possÃ­vel carregar categorias:', error)
     return []
   }
 
@@ -171,7 +171,7 @@ export async function getCategoryBySlug(slug: string) {
     .maybeSingle()
 
   if (error) {
-    console.error('SEO: não foi possível resolver categoria:', error)
+    console.error('SEO: nÃ£o foi possÃ­vel resolver categoria:', error)
     return null
   }
 
@@ -226,7 +226,7 @@ export async function getCategoryEventsBySlug(slug: string, limit = 120) {
 
   const merged = new Map<string, SeoEvent>()
 
-  for (const event of [...(byId.data || []), ...(byName.data || [])] as SeoEvent[]) {
+  for (const event of [...(byId.data || []), ...(byName.data || [])] as unknown as SeoEvent[]) {
     merged.set(event.id, event)
   }
 
