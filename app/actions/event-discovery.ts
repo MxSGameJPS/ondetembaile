@@ -301,6 +301,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         matched: number
         usedDataEndpoint: boolean
         usedHtmlEventPages: boolean
+        usedVenueExpansion: boolean
+        directEventLinksFound: number
+        venueLinksFound: number
+        venueEventLinksFound: number
         eventLinksFound: number
         buildId: string | null
         pageUrl: string
@@ -350,6 +354,10 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         matched: roleAgoraResult.events.length,
         usedDataEndpoint: roleAgoraResult.usedDataEndpoint,
         usedHtmlEventPages: roleAgoraResult.usedHtmlEventPages,
+        usedVenueExpansion: roleAgoraResult.usedVenueExpansion,
+        directEventLinksFound: roleAgoraResult.directEventLinksFound,
+        venueLinksFound: roleAgoraResult.venueLinksFound,
+        venueEventLinksFound: roleAgoraResult.venueEventLinksFound,
         eventLinksFound: roleAgoraResult.eventLinksFound,
         buildId: roleAgoraResult.buildId,
         pageUrl: roleAgoraResult.pageUrl,
