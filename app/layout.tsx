@@ -13,11 +13,11 @@ import {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Aonde Tem Baile | Eventos, bailes, festas e shows perto de você',
+    default: 'Aonde Tem Baile | Eventos, bailes, festas e shows perto de vocÃª',
     template: '%s | Aonde Tem Baile',
   },
   description:
-    'Descubra bailes, festas, shows e eventos regionais perto de você. Consulte datas, locais e informações dos próximos eventos da sua cidade.',
+    'Descubra bailes, festas, shows e eventos regionais perto de vocÃª. Consulte datas, locais e informaÃ§Ãµes dos prÃ³ximos eventos da sua cidade.',
   applicationName: SITE_NAME,
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
@@ -32,26 +32,26 @@ export const metadata: Metadata = {
     'eventos regionais',
     'agenda de eventos',
     'aonde tem baile',
-    'divulgação de eventos',
+    'divulgaÃ§Ã£o de eventos',
   ],
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: 'Aonde Tem Baile | Eventos, bailes, festas e shows perto de você',
+    title: 'Aonde Tem Baile | Eventos, bailes, festas e shows perto de vocÃª',
     description:
-      'Descubra eventos da sua cidade: bailes, festas, shows e programação regional em um só lugar.',
+      'Descubra eventos da sua cidade: bailes, festas, shows e programaÃ§Ã£o regional em um sÃ³ lugar.',
     images: [
       {
         url: DEFAULT_OG_IMAGE,
-        alt: 'Aonde Tem Baile — eventos, festas, bailes e shows',
+        alt: 'Aonde Tem Baile â€” eventos, festas, bailes e shows',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Aonde Tem Baile | Eventos perto de você',
+    title: 'Aonde Tem Baile | Eventos perto de vocÃª',
     description:
       'Descubra bailes, festas, shows e eventos regionais da sua cidade.',
     images: [DEFAULT_OG_IMAGE],
@@ -133,10 +133,10 @@ export default function RootLayout({
         >
           <div className="container">
             <p style={{ color: '#d1d5db', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              🪩 Aonde Tem Baile — O portal de eventos regionais do Brasil
+              ðŸª© Aonde Tem Baile â€” O portal de eventos regionais do Brasil
             </p>
             <p>
-              © {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.
+              Â© {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
               <Link href="/eventos" style={{ color: '#f59e0b', textDecoration: 'none' }}>
