@@ -21,6 +21,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
+      url: absoluteUrl('/eventos'),
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
       url: absoluteUrl('/quemsomos'),
       lastModified: now,
       changeFrequency: 'monthly',
@@ -54,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const eventPages: MetadataRoute.Sitemap = events.map((event) => ({
       url: absoluteUrl(`/evento/${event.id}`),
-      lastModified: event.updated_at ? new Date(event.updated_at) : new Date(event.event_date),
+      lastModified: event.updated_at ? new Date(event.updated_at) : now,
       changeFrequency: 'daily',
       priority: 0.8,
     }))
