@@ -91,8 +91,8 @@ export default async function CityEventsPage({ params }: CityPageProps) {
   const categories = Array.from(
     new Set(
       data.events
-        .map((event) => event.category_name)
-        .filter((value): value is string => Boolean(value))
+        .filter((event) => Boolean(event.category_id && event.category_name))
+        .map((event) => event.category_name as string)
     )
   ).slice(0, 12)
 
