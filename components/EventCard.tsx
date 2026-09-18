@@ -68,6 +68,8 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
         <img
           src={event.image_url}
           alt={event.title}
+          loading="lazy"
+          decoding="async"
           className={styles.bannerImg}
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80'
