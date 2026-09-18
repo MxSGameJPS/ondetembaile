@@ -37,8 +37,8 @@ export default async function ContatoSuportePage({
             <Mail size={20} aria-hidden="true" />
             <div>
               <strong>E-mail</strong>
-              <a href="mailto:contato@aondetembaile.com.br">
-                contato@aondetembaile.com.br
+              <a href="mailto:alexmobihaus@gmail.com">
+                alexmobihaus@gmail.com
               </a>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default async function ContatoSuportePage({
           )}
 
           <form
-            action="https://formsubmit.co/contato@aondetembaile.com.br"
+            action="https://formsubmit.co/alexmobihaus@gmail.com"
             method="POST"
             className={styles.form}
           >
