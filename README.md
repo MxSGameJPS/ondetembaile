@@ -307,11 +307,28 @@ API_GROQ_KEY=
 # Apify
 API_KEY_APIFY=
 APIFY_USER_ID=
+
+# SEO / verificação de propriedade (opcionais)
+GOOGLE_SITE_VERIFICATION=
+BING_SITE_VERIFICATION=
 ```
 
 A aplicação também aceita `GROQ_API_KEY` como fallback para a chave da Groq.
 
 > Nunca envie o arquivo `.env.local` ou chaves privadas para o repositório.
+
+### SEO e indexação
+
+A aplicação publica automaticamente:
+
+- `/robots.txt`;
+- `/sitemap.xml` dinâmico com eventos futuros aprovados, cidades e categorias;
+- `/llms.txt` como referência complementar para agentes e sistemas de IA;
+- dados estruturados `Organization`, `WebSite`, `Event`, `BreadcrumbList` e `ItemList`;
+- landing pages server-side em `/eventos`, `/eventos/[uf]/[cidade]` e `/eventos/categoria/[slug]`;
+- notificações IndexNow quando eventos são aprovados, editados, rejeitados ou removidos.
+
+Após o deploy, cadastre o domínio no Google Search Console e no Bing Webmaster Tools e envie `https://aondetembaile.com.br/sitemap.xml`. Os tokens de verificação por meta tag podem ser configurados por `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION`.
 
 ---
 
