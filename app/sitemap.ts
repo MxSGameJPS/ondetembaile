@@ -10,43 +10,44 @@ import {
 
 export const revalidate = 900
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date()
+function newestDate(values: Array<string | null | undefined>) {
+  const timestamps = values
+    .map((value) => (value ? new Date(value).getTime() : Number.NaN))
+    .filter((value) => Number.isFinite(value))
 
+  if (timestamps.length === 0) return undefined
+  return new Date(Math.max(...timestamps))
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
-      lastModified: now,
       changeFrequency: 'daily',
       priority: 1,
     },
     {
       url: absoluteUrl('/eventos'),
-      lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
       url: absoluteUrl('/quemsomos'),
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
       url: absoluteUrl('/contato-e-suporte'),
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
     {
       url: absoluteUrl('/termos-de-uso'),
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.3,
     },
     {
       url: absoluteUrl('/cadastro'),
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
@@ -60,29 +61,47 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const eventPages: MetadataRoute.Sitemap = events.map((event) => ({
       url: absoluteUrl(`/evento/${event.id}`),
-      lastModified: event.updated_at ? new Date(event.updated_at) : now,
+      lastModified: event.updated_at ? new Date(event.updated_at) : undefined,
       changeFrequency: 'daily',
       priority: 0.8,
     }))
 
-    const cities = new Map<string, { city: string; state: string }>()
+    const cities = new Map<string, string[]>()
     const usedCategoryIds = new Set<string>()
     const usedCategoryNames = new Set<string>()
+    const categoryUpdatesById = new Map<string, string[]>()
+    const categoryUpdatesByName = new Map<string, string[]>()
 
     for (const event of events) {
+      const updatedAt = event.updated_at || null
+
       if (event.city && event.state) {
         const path = citySeoPath(event.city, event.state)
-        cities.set(path, { city: event.city, state: event.state })
+        const updates = cities.get(path) || []
+        if (updatedAt) updates.push(updatedAt)
+        cities.set(path, updates)
       }
 
-      if (event.category_id) usedCategoryIds.add(event.category_id)
-      if (event.category_name) usedCategoryNames.add(event.category_name.toLowerCase())
+      if (event.category_id) {
+        usedCategoryIds.add(event.category_id)
+        const updates = categoryUpdatesById.get(event.category_id) || []
+        if (updatedAt) updates.push(updatedAt)
+        categoryUpdatesById.set(event.category_id, updates)
+      }
+
+      if (event.category_name) {
+        const normalizedName = event.category_name.toLowerCase()
+        usedCategoryNames.add(normalizedName)
+        const updates = categoryUpdatesByName.get(normalizedName) || []
+        if (updatedAt) updates.push(updatedAt)
+        categoryUpdatesByName.set(normalizedName, updates)
+      }
     }
 
     const cityPages: MetadataRoute.Sitemap = Array.from(cities.entries()).map(
-      ([path]) => ({
+      ([path, updates]) => ({
         url: absoluteUrl(path),
-        lastModified: now,
+        lastModified: newestDate(updates),
         changeFrequency: 'daily',
         priority: 0.75,
       })
@@ -96,12 +115,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       )
       .map((category) => ({
         url: absoluteUrl(categorySeoPath(category.slug)),
-        lastModified: now,
+        lastModified: newestDate([
+          ...(categoryUpdatesById.get(category.id) || []),
+          ...(categoryUpdatesByName.get(category.name.toLowerCase()) || []),
+        ]),
         changeFrequency: 'daily',
         priority: 0.7,
       }))
 
-    return [...staticPages, ...cityPages, ...categoryPages, ...eventPages]
+    const hubUpdatedAt = newestDate(events.map((event) => event.updated_at))
+    const pages = [...staticPages]
+
+    if (hubUpdatedAt) {
+      pages[1] = {
+        ...pages[1],
+        lastModified: hubUpdatedAt,
+      }
+    }
+
+    return [...pages, ...cityPages, ...categoryPages, ...eventPages]
   } catch (error) {
     console.error('SEO: sitemap dinâmico caiu para páginas estáticas:', error)
     return staticPages
