@@ -99,24 +99,6 @@ function metadataDescription(event: {
     : 'Confira este evento no Aonde Tem Baile.'
 }
 
-function ticketPriceValue(value?: string | null) {
-  const normalized = (value || '').trim().toLowerCase()
-
-  if (!normalized) return null
-  if (/gr[aá]tis|gratuito|free/.test(normalized)) return 0
-
-  const match = normalized.match(/\d{1,6}(?:[.,]\d{1,2})?/)
-  if (!match) return null
-
-  const numeric = match[0]
-  const decimalSeparator = numeric.includes(',') ? ',' : numeric.includes('.') ? '.' : null
-  const normalizedNumber = decimalSeparator
-    ? numeric.replace(decimalSeparator, '.')
-    : numeric
-  const parsed = Number(normalizedNumber)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
 export async function generateMetadata({
   params,
 }: EventPageProps): Promise<Metadata> {
@@ -214,8 +196,6 @@ export default async function EventDetailPage({ params }: EventPageProps) {
     ? categorySeoPath(event.category_name)
     : null
   const image = absoluteImageUrl(event.image_url)
-  const price = ticketPriceValue(event.ticket_price)
-
   const locationSchema: Record<string, unknown> = {
     '@type': 'Place',
     name:
@@ -259,16 +239,6 @@ export default async function EventDetailPage({ params }: EventPageProps) {
   if (event.event_end_date) eventSchema.endDate = event.event_end_date
   if (event.category_name) eventSchema.keywords = event.category_name
   if (event.source_url) eventSchema.sameAs = event.source_url
-
-  if (price !== null) {
-    eventSchema.isAccessibleForFree = price === 0
-    eventSchema.offers = {
-      '@type': 'Offer',
-      url: event.source_url || currentUrl,
-      price: price.toFixed(2),
-      priceCurrency: 'BRL',
-    }
-  }
 
   const breadcrumbItems = [
     {
