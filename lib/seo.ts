@@ -103,26 +103,43 @@ export async function getFutureApprovedEvents(input?: {
   const supabase = publicSeoClient()
   if (!supabase) return [] as SeoEvent[]
 
-  let query = supabase
-    .from('events')
-    .select(EVENT_SELECT)
-    .eq('status', 'approved')
-    .gte('event_date', new Date().toISOString())
-    .order('event_date', { ascending: true })
-    .limit(Math.min(Math.max(input?.limit ?? 500, 1), 1000))
+  const requestedLimit = Math.min(Math.max(input?.limit ?? 500, 1), 10000)
+  const pageSize = 1000
+  const events: SeoEvent[] = []
+  const now = new Date().toISOString()
 
-  if (input?.state) {
-    query = query.ilike('state', input.state)
+  while (events.length < requestedLimit) {
+    const batchSize = Math.min(pageSize, requestedLimit - events.length)
+    const from = events.length
+    const to = from + batchSize - 1
+
+    let query = supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .eq('status', 'approved')
+      .gte('event_date', now)
+      .order('event_date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    if (input?.state) {
+      query = query.ilike('state', input.state)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('SEO: não foi possível carregar eventos futuros:', error)
+      break
+    }
+
+    const batch = (data || []) as SeoEvent[]
+    events.push(...batch)
+
+    if (batch.length < batchSize) break
   }
 
-  const { data, error } = await query
-
-  if (error) {
-    console.error('SEO: não foi possível carregar eventos futuros:', error)
-    return []
-  }
-
-  return (data || []) as SeoEvent[]
+  return events
 }
 
 export async function getSeoCategories() {
@@ -169,7 +186,7 @@ export async function getCityEventsBySlug(
   const state = stateSlug.toUpperCase()
   const events = await getFutureApprovedEvents({
     state,
-    limit: Math.min(Math.max(limit * 4, 120), 700),
+    limit: Math.min(Math.max(limit * 12, 1000), 3000),
   })
 
   return events
