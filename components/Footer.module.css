@@ -1,0 +1,154 @@
+﻿.footer {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid rgba(242, 106, 0, 0.24);
+  background: linear-gradient(
+    180deg,
+    rgba(17, 17, 17, 0.98),
+    rgba(5, 5, 5, 1)
+  );
+  color: #9ca3af;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(242, 106, 0, 0.18), transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(245, 158, 11, 0.08), transparent 28%);
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100% - 3rem));
+  margin: 0 auto;
+  padding: 3.5rem 0 1.5rem;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.6fr) repeat(3, minmax(145px, 0.7fr));
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.brand {
+  max-width: 410px;
+}
+
+.logoLink {
+  display: inline-flex;
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+
+.description {
+  margin: 0;
+  max-width: 390px;
+  color: #9ca3af;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.primaryLink {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 1.25rem;
+  color: #f59e0b;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  color: #fbbf24;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.column h2 {
+  margin: 0 0 0.35rem;
+  color: #f3f4f6;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.column a {
+  width: fit-content;
+  color: #9ca3af;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.column a:hover {
+  color: #f59e0b;
+}
+
+.bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.bottom p {
+  margin: 0;
+}
+
+.credit a {
+  color: #d1d5db;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.credit a:hover {
+  color: #f59e0b;
+}
+
+@media (max-width: 900px) {
+  .top {
+    grid-template-columns: 1.4fr 1fr 1fr;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+    max-width: 560px;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: min(100% - 2rem, 1180px);
+    padding-top: 2.5rem;
+  }
+
+  .top {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem 1.25rem;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+  }
+
+  .bottom {
+    flex-direction: column;
+    margin-top: 2.5rem;
+  }
+}
