@@ -2,8 +2,10 @@ import type { GroqEventCandidate } from '@/lib/event-discovery/groq'
 
 const ROLE_AGORA_BASE_URL = 'https://www.roleagora.com.br'
 const FETCH_TIMEOUT_MS = 20000
-const MAX_EVENT_PAGES_PER_CITY = 40
+const MAX_EVENT_PAGES_PER_CITY = 80
+const MAX_VENUE_PAGES_PER_CITY = 36
 const EVENT_PAGE_CONCURRENCY = 6
+const VENUE_PAGE_CONCURRENCY = 6
 
 interface RoleAgoraLocation {
   name?: string | null
@@ -138,6 +140,69 @@ function extractEventLinks(html: string) {
   }
 
   return Array.from(links).slice(0, MAX_EVENT_PAGES_PER_CITY)
+}
+
+
+function extractVenueLinks(html: string, slug: string) {
+  const links = new Set<string>()
+  const hrefPattern = /href=["']([^"'?#<>\s]+)["']/gi
+  let match: RegExpExecArray | null
+
+  while ((match = hrefPattern.exec(html)) !== null) {
+    const raw = decodeHtmlEntities(match[1] || '')
+    if (!raw) continue
+
+    try {
+      const url = new URL(raw, ROLE_AGORA_BASE_URL)
+      if (url.hostname !== 'www.roleagora.com.br') continue
+
+      const segments = url.pathname.split('/').filter(Boolean)
+      if (segments.length < 3) continue
+      if (segments[0] !== slug) continue
+
+      url.hash = ''
+      url.search = ''
+      links.add(url.toString())
+    } catch {
+      // Ignora links inválidos.
+    }
+  }
+
+  return Array.from(links).slice(0, MAX_VENUE_PAGES_PER_CITY)
+}
+
+async function fetchVenueEventLinks(venueUrls: string[]) {
+  const eventLinks = new Set<string>()
+
+  for (
+    let index = 0;
+    index < venueUrls.length;
+    index += VENUE_PAGE_CONCURRENCY
+  ) {
+    const batch = venueUrls.slice(index, index + VENUE_PAGE_CONCURRENCY)
+    const results = await Promise.all(
+      batch.map(async (url) => {
+        try {
+          const html = await fetchText(url)
+          return extractEventLinks(html)
+        } catch (error) {
+          console.error('Erro ao ler local do Rolê Agora:', url, error)
+          return []
+        }
+      })
+    )
+
+    for (const links of results) {
+      for (const link of links) {
+        eventLinks.add(link)
+        if (eventLinks.size >= MAX_EVENT_PAGES_PER_CITY) {
+          return Array.from(eventLinks)
+        }
+      }
+    }
+  }
+
+  return Array.from(eventLinks)
 }
 
 function collectJsonLdEvents(value: unknown, output: Record<string, unknown>[]) {
@@ -552,7 +617,15 @@ export async function discoverRoleAgoraEvents(input: {
   const rawEvents: RoleAgoraEvent[] = []
   payloads.forEach((payload) => collectEvents(payload, rawEvents))
 
-  const eventLinks = extractEventLinks(html)
+  const directEventLinks = extractEventLinks(html)
+  const venueLinks = extractVenueLinks(html, slug)
+  const venueEventLinks =
+    venueLinks.length > 0 ? await fetchVenueEventLinks(venueLinks) : []
+
+  const eventLinks = Array.from(
+    new Set([...directEventLinks, ...venueEventLinks])
+  ).slice(0, MAX_EVENT_PAGES_PER_CITY)
+
   let usedHtmlEventPages = false
 
   if (eventLinks.length > 0) {
@@ -591,6 +664,10 @@ export async function discoverRoleAgoraEvents(input: {
     buildId: buildId || null,
     usedDataEndpoint,
     usedHtmlEventPages,
+    usedVenueExpansion: venueEventLinks.length > 0,
+    directEventLinksFound: directEventLinks.length,
+    venueLinksFound: venueLinks.length,
+    venueEventLinksFound: venueEventLinks.length,
     eventLinksFound: eventLinks.length,
     warnings:
       candidates.length === 0
