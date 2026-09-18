@@ -12,6 +12,7 @@ function revalidatePublicEventSeo(event: {
   id: string
   city?: string | null
   state?: string | null
+  category_id?: string | null
   category_name?: string | null
 }) {
   revalidatePath('/eventos')
@@ -22,7 +23,7 @@ function revalidatePublicEventSeo(event: {
     revalidatePath(citySeoPath(event.city, event.state))
   }
 
-  if (event.category_name) {
+  if (event.category_id && event.category_name) {
     revalidatePath(categorySeoPath(event.category_name))
   }
 }
@@ -409,7 +410,7 @@ export async function deleteEventAction(eventId: string) {
 
   const { data: eventToDelete } = await supabase
     .from('events')
-    .select('id, city, state, category_name')
+    .select('id, city, state, category_id, category_name')
     .eq('id', eventId)
     .maybeSingle()
 
