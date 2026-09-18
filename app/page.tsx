@@ -14,6 +14,12 @@ interface Category {
   slug: string
 }
 
+interface CitySuggestion {
+  name: string
+  state: string
+  label: string
+}
+
 const HERO_IMAGES = [
   '/img_hero/carousel/image.png',
   '/img_hero/carousel/image2.png',
@@ -121,6 +127,10 @@ export default function HomePage() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
+  const [citySuggestionsLoading, setCitySuggestionsLoading] = useState(false)
+  const [selectedCityState, setSelectedCityState] = useState<string | null>(null)
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null)
   const [eventCityCenters, setEventCityCenters] = useState<
     Record<string, { lat: number; lng: number }>
@@ -162,6 +172,52 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    const query = searchCity.trim()
+
+    if (query.length < 2) {
+      setCitySuggestions([])
+      setCitySuggestionsLoading(false)
+      setShowCitySuggestions(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setCitySuggestionsLoading(true)
+
+      try {
+        const response = await fetch(
+          `/api/cities?q=${encodeURIComponent(query)}`,
+          {
+            signal: controller.signal,
+          }
+        )
+        const data = await response.json().catch(() => null)
+
+        if (response.ok && Array.isArray(data?.cities)) {
+          setCitySuggestions(data.cities)
+        } else {
+          setCitySuggestions([])
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Não foi possível carregar sugestões de cidades:', error)
+          setCitySuggestions([])
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCitySuggestionsLoading(false)
+        }
+      }
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [searchCity])
+
+  useEffect(() => {
     const cityQuery = searchCity.trim()
 
     if (cityQuery.length < 2) {
@@ -172,7 +228,7 @@ export default function HomePage() {
     const exactCityEvent = events.find(
       (event) => normalizeCity(event.city) === normalizeCity(cityQuery)
     )
-    const state = exactCityEvent?.state || 'RS'
+    const state = selectedCityState || exactCityEvent?.state || 'RS'
     const controller = new AbortController()
 
     const timer = window.setTimeout(async () => {
@@ -209,7 +265,7 @@ export default function HomePage() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchCity, events])
+  }, [searchCity, events, selectedCityState])
 
   useEffect(() => {
     if (!searchCenter || searchCity.trim().length < 2 || events.length === 0) return
@@ -326,6 +382,13 @@ export default function HomePage() {
     scrollToResults()
   }
 
+  const handleCitySuggestionSelect = (city: CitySuggestion) => {
+    setSearchCity(city.name)
+    setSelectedCityState(city.state)
+    setShowCitySuggestions(false)
+    setCitySuggestions([])
+  }
+
   // Filter events by City search, Category & Period
   const filteredEvents = events.filter((e) => {
     const cityQuery = normalizeCity(searchCity)
@@ -380,6 +443,9 @@ export default function HomePage() {
 
   const clearFilters = () => {
     setSearchCity('')
+    setSelectedCityState(null)
+    setCitySuggestions([])
+    setShowCitySuggestions(false)
     setSelectedCategory('all')
     setFilterPeriod('all')
   }
@@ -430,12 +496,67 @@ export default function HomePage() {
                 type="text"
                 placeholder="Buscar por Cidade (ex: Porto Alegre)..."
                 value={searchCity}
-                onChange={(e) => setSearchCity(e.target.value)}
+                onChange={(e) => {
+                  setSearchCity(e.target.value)
+                  setSelectedCityState(null)
+                  setShowCitySuggestions(e.target.value.trim().length >= 2)
+                }}
+                onFocus={() => {
+                  if (searchCity.trim().length >= 2) {
+                    setShowCitySuggestions(true)
+                  }
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') scrollToResults()
+                  if (e.key === 'Enter') {
+                    setShowCitySuggestions(false)
+                    scrollToResults()
+                  }
+
+                  if (e.key === 'Escape') {
+                    setShowCitySuggestions(false)
+                  }
                 }}
                 className={styles.searchInput}
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={showCitySuggestions}
+                aria-controls="city-suggestions"
               />
+
+              {showCitySuggestions && searchCity.trim().length >= 2 && (
+                <div
+                  id="city-suggestions"
+                  className={styles.citySuggestions}
+                  role="listbox"
+                  aria-label="Sugestões de cidades"
+                >
+                  {citySuggestionsLoading ? (
+                    <div className={styles.citySuggestionStatus}>
+                      Buscando cidades...
+                    </div>
+                  ) : citySuggestions.length > 0 ? (
+                    citySuggestions.map((city) => (
+                      <button
+                        key={`${city.name}-${city.state}`}
+                        type="button"
+                        className={styles.citySuggestion}
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleCitySuggestionSelect(city)}
+                      >
+                        <span>{city.name}</span>
+                        <strong>{city.state}</strong>
+                      </button>
+                    ))
+                  ) : (
+                    <div className={styles.citySuggestionStatus}>
+                      Nenhuma cidade encontrada.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Input 2: Categoria Dropdown */}
