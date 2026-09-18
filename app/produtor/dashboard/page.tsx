@@ -68,7 +68,7 @@ export default function ProducerDashboard() {
 
   const handleSaveEventSuccess = (updatedEvent: EventItem) => {
     setEvents((current) => current.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)))
-    alert('Evento atualizado com sucesso!')
+    alert('Evento corrigido e reenviado para uma nova análise!')
   }
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -148,15 +148,23 @@ export default function ProducerDashboard() {
               event={event}
               showStatus={true}
               adminActions={
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', width: '100%' }}>
-                  <button
-                    onClick={() => handleEditEvent(event)}
-                    className="btn-primary"
-                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', gap: '0.3rem', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Edit3 size={14} />
-                    <span>Editar</span>
-                  </button>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {event.status === 'rejected' && !event.rejection_is_permanent && (
+                    <button
+                      onClick={() => handleEditEvent(event)}
+                      className="btn-primary"
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', gap: '0.3rem', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Edit3 size={14} />
+                      <span>Editar e reenviar</span>
+                    </button>
+                  )}
+
+                  {event.status === 'rejected' && event.rejection_is_permanent && (
+                    <span style={{ color: '#fca5a5', fontSize: '0.72rem', fontWeight: 700 }}>
+                      Edição bloqueada pela moderação
+                    </span>
+                  )}
 
                   <button
                     onClick={() => handleDeleteEvent(event.id)}

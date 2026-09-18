@@ -28,6 +28,7 @@ export interface EventItem {
   instagram_handle?: string | null
   status?: string
   rejection_reason?: string | null
+  rejection_is_permanent?: boolean
 }
 
 interface EventCardProps {
@@ -97,7 +98,9 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
               <span className="badge badge-gold">Em Análise</span>
             )}
             {event.status === 'rejected' && (
-              <span className="badge badge-red">Recusado</span>
+              <span className="badge badge-red">
+                {event.rejection_is_permanent ? 'Recusado definitivamente' : 'Recusado'}
+              </span>
             )}
           </div>
         )}
@@ -128,6 +131,11 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
         {showStatus && event.status === 'rejected' && event.rejection_reason && (
           <div style={{ margin: '0.5rem 0', padding: '0.5rem 0.75rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '0.75rem', color: '#fca5a5' }}>
             <strong>Motivo da recusa:</strong> {event.rejection_reason}
+            {event.rejection_is_permanent && (
+              <div style={{ marginTop: '0.4rem', fontWeight: 700 }}>
+                Esta recusa é definitiva e a edição pelo produtor está desabilitada.
+              </div>
+            )}
           </div>
         )}
 

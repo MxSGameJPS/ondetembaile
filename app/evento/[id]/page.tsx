@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import type { Metadata } from 'next'
+import { cache } from 'react'
 import EventMap from '@/components/EventMap'
 import SocialShare from '@/components/SocialShare'
 import { Calendar, MapPin, MessageCircle, ArrowLeft, Globe, Share2, ExternalLink } from 'lucide-react'
@@ -10,25 +12,23 @@ interface EventPageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function EventDetailPage({ params }: EventPageProps) {
-  const { id } = await params
-  const supabase = await createClient()
+const SITE_URL = 'https://aondetembaile.com.br'
 
-  // Fetch event from Supabase
-  let event = null
-
+const getEventById = cache(async (id: string) => {
   if (id.startsWith('demo-')) {
-    event = {
-      id: id,
+    return {
+      id,
       title: 'Grande Baile de Gaúcho com Os Serranos',
-      description: 'Um evento imperdível com o melhor da música tradicionalista gaucha. Muita vanera, xote e fandango para animar a noite toda. Estacionamento amplo, segurança no local e ambiente climatizado. Garanta já o seu ingresso!',
+      description:
+        'Um evento imperdível com o melhor da música tradicionalista gaucha. Muita vanera, xote e fandango para animar a noite toda. Estacionamento amplo, segurança no local e ambiente climatizado. Garanta já o seu ingresso!',
       location_name: 'CTG Estância da Tradição',
       address: 'Av. das Indústrias, 1500 - Porto Alegre, RS',
       city: 'Porto Alegre',
       state: 'RS',
       latitude: -30.0346,
       longitude: -51.2177,
-      image_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
+      image_url:
+        'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
       event_date: new Date(Date.now() + 86400000 * 3).toISOString(),
       event_end_date: null,
       ticket_price: 'R$ 35,00',
@@ -36,18 +36,105 @@ export default async function EventDetailPage({ params }: EventPageProps) {
       facebook_url: 'https://facebook.com',
       instagram_handle: '@osserranos',
       status: 'approved',
-    }
-  } else {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', id)
-      .single()
-
-    if (!error && data) {
-      event = data
+      source_url: null,
     }
   }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data
+})
+
+function absoluteImageUrl(imageUrl?: string | null) {
+  if (!imageUrl) {
+    return `${SITE_URL}/logos/Logo_03_Horizontal_Transparente.png`
+  }
+
+  try {
+    return new URL(imageUrl, SITE_URL).toString()
+  } catch {
+    return `${SITE_URL}/logos/Logo_03_Horizontal_Transparente.png`
+  }
+}
+
+function metadataDescription(event: {
+  description?: string | null
+  city?: string | null
+  state?: string | null
+}) {
+  const description = event.description?.replace(/\s+/g, ' ').trim()
+
+  if (description) {
+    return description.length > 160
+      ? `${description.slice(0, 157).trimEnd()}...`
+      : description
+  }
+
+  const location = [event.city, event.state].filter(Boolean).join(' - ')
+  return location
+    ? `Confira este evento em ${location} no Aonde Tem Baile.`
+    : 'Confira este evento no Aonde Tem Baile.'
+}
+
+export async function generateMetadata({
+  params,
+}: EventPageProps): Promise<Metadata> {
+  const { id } = await params
+  const event = await getEventById(id)
+
+  if (!event) {
+    return {
+      title: 'Evento | Aonde Tem Baile',
+      description: 'Confira eventos, bailes, festas e shows no Aonde Tem Baile.',
+    }
+  }
+
+  const url = `${SITE_URL}/evento/${event.id}`
+  const image = absoluteImageUrl(event.image_url)
+  const description = metadataDescription(event)
+  const title = `${event.title} | Aonde Tem Baile`
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: 'Aonde Tem Baile',
+      locale: 'pt_BR',
+      type: 'website',
+      images: [
+        {
+          url: image,
+          alt: event.title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image],
+    },
+  }
+}
+
+export default async function EventDetailPage({ params }: EventPageProps) {
+  const { id } = await params
+  const event = await getEventById(id)
 
   if (!event) {
     notFound()
@@ -75,7 +162,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
   const whatsappUrl = cleanWhatsapp
     ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Quero mais informações sobre o evento "${event.title}" no Aonde Tem Baile.`)}`
     : null
-  const currentUrl = `https://aondetembaile.com.br/evento/${event.id}`
+  const currentUrl = `${SITE_URL}/evento/${event.id}`
 
   return (
     <div className={styles.container}>

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEventSubmittedEmail, sendEventStatusEmail } from '@/lib/resend/emails'
 import { revalidatePath } from 'next/cache'
 import { geocodeLocation } from '@/lib/geocoding/server'
@@ -159,7 +160,7 @@ export async function updateEventAction(
   // Verify event existence and ownership if not admin
   const { data: existingEvent } = await supabase
     .from('events')
-    .select('producer_id')
+    .select('producer_id, status, rejection_is_permanent')
     .eq('id', eventId)
     .single()
 
@@ -169,6 +170,22 @@ export async function updateEventAction(
 
   if (!isAdmin && existingEvent.producer_id !== user.id) {
     return { success: false, error: 'Apenas administradores ou o criador do evento podem editá-lo.' }
+  }
+
+  if (!isAdmin) {
+    if (existingEvent.status !== 'rejected') {
+      return {
+        success: false,
+        error: 'O evento só pode ser editado pelo produtor quando a moderação solicitar ajustes.',
+      }
+    }
+
+    if (existingEvent.rejection_is_permanent) {
+      return {
+        success: false,
+        error: 'Este evento foi recusado permanentemente e não pode mais ser editado.',
+      }
+    }
   }
 
   const startTime = new Date(formData.event_date).getTime()
@@ -226,6 +243,17 @@ export async function updateEventAction(
 
   if (isAdmin && formData.status) {
     updateData.status = formData.status
+
+    if (formData.status !== 'rejected') {
+      updateData.rejection_reason = null
+      updateData.rejection_is_permanent = false
+    }
+  } else if (!isAdmin) {
+    // A producer can only edit a normally rejected event. Saving it resubmits
+    // the event to moderation and clears the previous rejection state.
+    updateData.status = 'pending'
+    updateData.rejection_reason = null
+    updateData.rejection_is_permanent = false
   }
 
   const { data: updatedEvent, error: updateError } = await supabase
@@ -250,7 +278,10 @@ export async function updateEventAction(
 export async function updateEventStatusAction(
   eventId: string,
   status: 'approved' | 'rejected',
-  rejectionReason?: string
+  rejectionReason?: string,
+  options?: {
+    permanent?: boolean
+  }
 ) {
   const supabase = await createClient()
 
@@ -259,7 +290,6 @@ export async function updateEventStatusAction(
     return { success: false, error: 'Não autorizado.' }
   }
 
-  // Verify Admin / SuperAdmin role
   const { data: adminProfile } = await supabase
     .from('profiles')
     .select('role')
@@ -270,13 +300,31 @@ export async function updateEventStatusAction(
     return { success: false, error: 'Apenas administradores podem alterar o status de eventos.' }
   }
 
-  // Update event
+  const permanentRejection = status === 'rejected' && Boolean(options?.permanent)
+
+  if (permanentRejection && adminProfile.role !== 'superadmin') {
+    return {
+      success: false,
+      error: 'Apenas o SuperAdmin pode recusar um evento permanentemente.',
+    }
+  }
+
+  const cleanReason = rejectionReason?.trim() || ''
+
+  if (status === 'rejected' && !cleanReason) {
+    return {
+      success: false,
+      error: 'Informe o motivo da recusa para orientar o produtor.',
+    }
+  }
+
   const { data: event, error: updateError } = await supabase
     .from('events')
     .update({
       status,
-      rejection_reason: rejectionReason || null,
-      updated_at: new Date().toISOString()
+      rejection_reason: status === 'rejected' ? cleanReason : null,
+      rejection_is_permanent: permanentRejection,
+      updated_at: new Date().toISOString(),
     })
     .eq('id', eventId)
     .select('*, profiles(name, id)')
@@ -286,25 +334,39 @@ export async function updateEventStatusAction(
     return { success: false, error: updateError?.message || 'Evento não encontrado.' }
   }
 
-  // Fetch producer email from auth if possible
-  const { data: producerUser } = await supabase.auth.admin?.getUserById(event.producer_id)
-    .catch(() => ({ data: { user: null } })) || { data: { user: null } }
+  let notificationSent = false
+  const adminClient = createAdminClient()
 
-  // Send status update email if we have producer's email
-  if (producerUser?.user?.email) {
-    await sendEventStatusEmail(
-      producerUser.user.email,
-      event.profiles?.name || 'Produtor',
-      event.title,
-      status,
-      rejectionReason
+  if (!adminClient) {
+    console.error(
+      'E-mail de moderação não enviado: SUPABASE_SERVICE_ROLE_KEY não está configurada no servidor.'
     )
+  } else {
+    const { data: producerUser, error: producerError } =
+      await adminClient.auth.admin.getUserById(event.producer_id)
+
+    if (producerError) {
+      console.error('Erro ao buscar e-mail do produtor no Supabase Auth:', producerError)
+    } else if (producerUser.user?.email) {
+      const emailResult = await sendEventStatusEmail(
+        producerUser.user.email,
+        event.profiles?.name || 'Produtor',
+        event.title,
+        status,
+        status === 'rejected' ? cleanReason : undefined,
+        permanentRejection
+      )
+
+      notificationSent = emailResult.success
+    }
   }
 
   revalidatePath('/admin/dashboard')
+  revalidatePath('/produtor/dashboard')
   revalidatePath('/')
   revalidatePath(`/evento/${eventId}`)
-  return { success: true }
+
+  return { success: true, notificationSent }
 }
 
 export async function deleteEventAction(eventId: string) {

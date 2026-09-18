@@ -275,7 +275,8 @@ ondetembaile/
 │   └── logos/
 │
 ├── supabase/
-│   └── event_discovery_setup.sql
+│   ├── event_discovery_setup.sql
+│   └── event_moderation_setup.sql
 │
 ├── netlify.toml
 ├── package.json
@@ -292,6 +293,7 @@ Crie um arquivo `.env.local` na raiz do projeto.
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY= # somente servidor; nunca use NEXT_PUBLIC_
 
 # E-mail
 RESEND_API_KEY=
@@ -317,15 +319,16 @@ A aplicação também aceita `GROQ_API_KEY` como fallback para a chave da Groq.
 
 O projeto utiliza **Supabase/PostgreSQL**.
 
-A configuração relacionada à descoberta de eventos está documentada em:
+Os scripts SQL versionados ficam em:
 
 ```text
 supabase/event_discovery_setup.sql
+supabase/event_moderation_setup.sql
 ```
 
-Esse script contém estruturas utilizadas pelo fluxo de candidatos, controle de consumo de APIs e campos auxiliares de eventos.
+O primeiro contém estruturas do fluxo de descoberta de eventos. O segundo adiciona o estado de recusa permanente utilizado pela moderação.
 
-Sempre revise o SQL antes de executar em produção.
+Antes de publicar esta versão, execute `supabase/event_moderation_setup.sql` no projeto Supabase correto. Sempre revise o SQL antes de executar em produção.
 
 ---
 
@@ -419,7 +422,8 @@ Revisão
    ┌────┴────┐
    │         │
  Aprovar   Recusar
-   │
+   │        ├── normal → produtor pode corrigir e reenviar
+   │        └── permanente → edição do produtor bloqueada
    ▼
 Evento publicado
    │
@@ -435,6 +439,7 @@ Alguns cuidados adotados no projeto:
 
 - ações administrativas verificam autenticação e papel do usuário;
 - chaves de APIs externas são usadas somente no servidor;
+- `SUPABASE_SERVICE_ROLE_KEY` é usada somente no servidor para localizar o e-mail do produtor no Supabase Auth;
 - variáveis públicas do Supabase utilizam o prefixo `NEXT_PUBLIC_`;
 - candidatos externos passam por revisão administrativa;
 - URLs e dados de fontes públicas passam por normalização e validação;
