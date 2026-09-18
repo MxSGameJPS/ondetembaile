@@ -176,8 +176,11 @@ export default function AdminDashboardPage() {
       const apifyText = res.apifyUsage
         ? ` Facebook/Apify: ${res.apifyUsage.resultItems} post(s) coletado(s), ${res.apifyUsage.queuedPosts} colocado(s) diretamente na fila para revisão manual, custo estimado desta busca US$ ${res.apifyUsage.estimatedCostUsd.toFixed(2)} e total mensal estimado US$ ${res.apifyUsage.monthlyEstimatedCostUsd.toFixed(2)} de US$ ${res.apifyUsage.monthlyBudgetUsd.toFixed(2)}.`
         : ''
+      const roleAgoraText = res.roleAgoraUsage
+        ? ` Rolê Agora: ${res.roleAgoraUsage.scanned} evento(s) estruturado(s) lido(s), ${res.roleAgoraUsage.matched} dentro da janela escolhida; ${res.roleAgoraUsage.usedDataEndpoint ? 'JSON do Next.js utilizado' : '__NEXT_DATA__ da página utilizado como fallback'}.`
+        : ''
       setDiscoverySummary(
-        `Foram processados ${res.searched} resultado(s) e ${res.found} candidato(s) foram adicionados/atualizados na fila.${apifyText}${warningText}`
+        `Foram processados ${res.searched} resultado(s) e ${res.found} candidato(s) foram adicionados/atualizados na fila.${roleAgoraText}${apifyText}${warningText}`
       )
     } else {
       setDiscoveryError(res.error)

@@ -11,6 +11,7 @@ import {
 } from '@/lib/apify/facebook-posts'
 import { mapFacebookPostsToReviewCandidates } from '@/lib/event-discovery/facebook-posts'
 import { discoverEventsWithBrave } from '@/lib/event-discovery/brave-discovery'
+import { discoverRoleAgoraEvents } from '@/lib/event-discovery/roleagora'
 import {
   getDiscoveryWindow,
   inspectEventUrlWithGroqCompound,
@@ -294,9 +295,21 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         monthlyBudgetUsd: number
       }
     | null = null
+  let roleAgoraUsage:
+    | {
+        scanned: number
+        matched: number
+        usedDataEndpoint: boolean
+        buildId: string | null
+        pageUrl: string
+      }
+    | null = null
 
   const facebookRequested = sources.includes('facebook')
-  const braveSources = sources.filter((source) => source !== 'facebook')
+  const roleAgoraRequested = sources.includes('roleagora')
+  const braveSources = sources.filter(
+    (source) => source !== 'facebook' && source !== 'roleagora'
+  )
 
   if (braveSources.length > 0) {
     try {
@@ -315,6 +328,35 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
       console.error('Erro na descoberta com Brave:', error)
       warnings.push(
         `Web: ${error instanceof Error ? error.message : 'falha inesperada no Brave'}`
+      )
+    }
+  }
+
+  if (roleAgoraRequested) {
+    try {
+      const roleAgoraResult = await discoverRoleAgoraEvents({
+        city,
+        state: state || undefined,
+        periodDays,
+      })
+
+      discovered.push(...roleAgoraResult.events)
+      searched += roleAgoraResult.scanned
+      warnings.push(...roleAgoraResult.warnings)
+      roleAgoraUsage = {
+        scanned: roleAgoraResult.scanned,
+        matched: roleAgoraResult.events.length,
+        usedDataEndpoint: roleAgoraResult.usedDataEndpoint,
+        buildId: roleAgoraResult.buildId,
+        pageUrl: roleAgoraResult.pageUrl,
+      }
+      completedPipelines += 1
+    } catch (error) {
+      console.error('Erro na descoberta estruturada do Rolê Agora:', error)
+      warnings.push(
+        `Rolê Agora: ${
+          error instanceof Error ? error.message : 'falha inesperada ao ler a agenda'
+        }`
       )
     }
   }
@@ -462,6 +504,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     warnings,
     window,
     apifyUsage,
+    roleAgoraUsage,
   }
 }
 
