@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { SITE_NAME, SITE_URL } from '@/lib/seo'
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from '@/lib/seo'
 import Link from 'next/link'
 import { CalendarSearch, HeartHandshake, MapPin, ShieldCheck } from 'lucide-react'
 import styles from './page.module.css'
@@ -19,6 +19,14 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
     siteName: SITE_NAME,
+    images: [{ url: DEFAULT_OG_IMAGE, alt: 'Quem Somos — Aonde Tem Baile' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Quem Somos | ${SITE_NAME}`,
+    description:
+      'Conheça a proposta do Aonde Tem Baile e como conectamos público, produtores e eventos regionais.',
+    images: [DEFAULT_OG_IMAGE],
   },
 }
 
