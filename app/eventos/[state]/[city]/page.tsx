@@ -5,6 +5,7 @@ import EventCard from '@/components/EventCard'
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
+  absoluteUrl,
   SITE_URL,
   categorySeoPath,
   citySeoPath,
@@ -51,7 +52,9 @@ export async function generateMetadata({
   const canonical = new URL(canonicalPath, SITE_URL).toString()
   const title = `Eventos em ${data.cityName} - ${data.stateName}`
   const description = `Veja os próximos eventos em ${data.cityName}, ${data.stateName}: bailes, festas, shows e programação regional com datas, locais e informações atualizadas.`
-  const image = data.events.find((event) => event.image_url)?.image_url || DEFAULT_OG_IMAGE
+  const image = absoluteUrl(
+    data.events.find((event) => event.image_url)?.image_url || DEFAULT_OG_IMAGE
+  )
 
   return {
     title,
@@ -179,7 +182,18 @@ export default async function CityEventsPage({ params }: CityPageProps) {
 
       <section className={styles.grid} aria-label="Próximos eventos">
         {data.events.map((event) => (
-          <EventCard key={event.id} event={event as any} />
+          <EventCard
+            key={event.id}
+            event={{
+              ...event,
+              description: event.description || '',
+              address:
+                event.address ||
+                [event.city, event.state].filter(Boolean).join(', '),
+              image_url: event.image_url || '/img_hero/image.png',
+              ticket_price: event.ticket_price || 'Consultar',
+            }}
+          />
         ))}
       </section>
     </div>
