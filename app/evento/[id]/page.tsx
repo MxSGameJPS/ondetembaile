@@ -99,17 +99,6 @@ function metadataDescription(event: {
     : 'Confira este evento no Aonde Tem Baile.'
 }
 
-function isExpiredEvent(event: {
-  event_date: string
-  event_end_date?: string | null
-}) {
-  const reference = new Date(event.event_end_date || event.event_date).getTime()
-  if (Number.isNaN(reference)) return false
-
-  const gracePeriod = 7 * 24 * 60 * 60 * 1000
-  return reference < Date.now() - gracePeriod
-}
-
 function ticketPriceValue(value?: string | null) {
   const normalized = (value || '').trim().toLowerCase()
 
@@ -149,7 +138,7 @@ export async function generateMetadata({
   const image = absoluteImageUrl(event.image_url)
   const description = metadataDescription(event)
   const socialTitle = `${event.title} | ${SITE_NAME}`
-  const shouldIndex = !id.startsWith('demo-') && !isExpiredEvent(event)
+  const shouldIndex = !id.startsWith('demo-')
 
   return {
     title: event.title,
