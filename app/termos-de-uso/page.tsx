@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { SITE_NAME, SITE_URL } from '@/lib/seo'
+import { DEFAULT_OG_IMAGE, SITE_NAME, SITE_URL } from '@/lib/seo'
 import { ShieldCheck, ArrowLeft, FileText, Lock, AlertCircle, HelpCircle } from 'lucide-react'
 import styles from './page.module.css'
 
@@ -19,6 +19,14 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
     siteName: SITE_NAME,
+    images: [{ url: DEFAULT_OG_IMAGE, alt: 'Termos de Uso e Privacidade — Aonde Tem Baile' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Termos de Uso e Privacidade | ${SITE_NAME}`,
+    description:
+      'Consulte as condições de uso e diretrizes de privacidade do Aonde Tem Baile.',
+    images: [DEFAULT_OG_IMAGE],
   },
 }
 
