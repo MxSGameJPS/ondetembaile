@@ -15,6 +15,7 @@ interface IndexableEvent {
   id: string
   city?: string | null
   state?: string | null
+  category_id?: string | null
   category_name?: string | null
 }
 
@@ -88,7 +89,7 @@ export async function notifyIndexNowForEvent(event: IndexableEvent) {
     urls.push(absoluteUrl(citySeoPath(event.city, event.state)))
   }
 
-  if (event.category_name) {
+  if (event.category_id && event.category_name) {
     urls.push(absoluteUrl(categorySeoPath(event.category_name)))
   }
 
