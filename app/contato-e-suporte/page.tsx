@@ -1,12 +1,25 @@
 import type { Metadata } from 'next'
+import { SITE_NAME, SITE_URL } from '@/lib/seo'
 import Link from 'next/link'
 import { CheckCircle2, Mail, MessageSquareText } from 'lucide-react'
 import styles from './page.module.css'
 
 export const metadata: Metadata = {
-  title: 'Contato e Suporte | Aonde Tem Baile',
+  title: 'Contato e Suporte',
   description:
     'Entre em contato com a equipe do Aonde Tem Baile para suporte, dúvidas sobre eventos, cadastro ou moderação.',
+  alternates: {
+    canonical: `${SITE_URL}/contato-e-suporte`,
+  },
+  openGraph: {
+    title: `Contato e Suporte | ${SITE_NAME}`,
+    description:
+      'Fale com a equipe do Aonde Tem Baile sobre eventos, cadastro, moderação ou suporte.',
+    url: `${SITE_URL}/contato-e-suporte`,
+    type: 'website',
+    locale: 'pt_BR',
+    siteName: SITE_NAME,
+  },
 }
 
 interface ContactPageProps {
