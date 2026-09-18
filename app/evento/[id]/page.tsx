@@ -3,16 +3,30 @@ import type { Metadata } from 'next'
 import { cache } from 'react'
 import EventMap from '@/components/EventMap'
 import SocialShare from '@/components/SocialShare'
-import { Calendar, MapPin, MessageCircle, ArrowLeft, Globe, Share2, ExternalLink } from 'lucide-react'
+import {
+  Calendar,
+  MapPin,
+  MessageCircle,
+  ArrowLeft,
+  Globe,
+  Share2,
+  ExternalLink,
+} from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import {
+  DEFAULT_LOGO,
+  SITE_NAME,
+  SITE_URL,
+  categorySeoPath,
+  citySeoPath,
+  jsonLd,
+} from '@/lib/seo'
 import styles from './page.module.css'
 
 interface EventPageProps {
   params: Promise<{ id: string }>
 }
-
-const SITE_URL = 'https://aondetembaile.com.br'
 
 const getEventById = cache(async (id: string) => {
   if (id.startsWith('demo-')) {
@@ -27,6 +41,7 @@ const getEventById = cache(async (id: string) => {
       state: 'RS',
       latitude: -30.0346,
       longitude: -51.2177,
+      category_name: 'Baile Tradicionalista / Gaúcho',
       image_url:
         'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
       event_date: new Date(Date.now() + 86400000 * 3).toISOString(),
@@ -45,6 +60,7 @@ const getEventById = cache(async (id: string) => {
     .from('events')
     .select('*')
     .eq('id', id)
+    .eq('status', 'approved')
     .single()
 
   if (error || !data) {
@@ -55,14 +71,12 @@ const getEventById = cache(async (id: string) => {
 })
 
 function absoluteImageUrl(imageUrl?: string | null) {
-  if (!imageUrl) {
-    return `${SITE_URL}/logos/Logo_03_Horizontal_Transparente.png`
-  }
+  if (!imageUrl) return DEFAULT_LOGO
 
   try {
     return new URL(imageUrl, SITE_URL).toString()
   } catch {
-    return `${SITE_URL}/logos/Logo_03_Horizontal_Transparente.png`
+    return DEFAULT_LOGO
   }
 }
 
@@ -85,6 +99,30 @@ function metadataDescription(event: {
     : 'Confira este evento no Aonde Tem Baile.'
 }
 
+function isExpiredEvent(event: {
+  event_date: string
+  event_end_date?: string | null
+}) {
+  const reference = new Date(event.event_end_date || event.event_date).getTime()
+  if (Number.isNaN(reference)) return false
+
+  const gracePeriod = 7 * 24 * 60 * 60 * 1000
+  return reference < Date.now() - gracePeriod
+}
+
+function ticketPriceValue(value?: string | null) {
+  const normalized = (value || '').trim().toLowerCase()
+
+  if (!normalized) return null
+  if (/gr[aá]tis|gratuito|free/.test(normalized)) return 0
+
+  const match = normalized.match(/\d{1,6}(?:[.,]\d{1,2})?/)
+  if (!match) return null
+
+  const parsed = Number(match[0].replace('.', '').replace(',', '.'))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export async function generateMetadata({
   params,
 }: EventPageProps): Promise<Metadata> {
@@ -93,27 +131,36 @@ export async function generateMetadata({
 
   if (!event) {
     return {
-      title: 'Evento | Aonde Tem Baile',
+      title: 'Evento não encontrado',
       description: 'Confira eventos, bailes, festas e shows no Aonde Tem Baile.',
+      robots: {
+        index: false,
+        follow: false,
+      },
     }
   }
 
   const url = `${SITE_URL}/evento/${event.id}`
   const image = absoluteImageUrl(event.image_url)
   const description = metadataDescription(event)
-  const title = `${event.title} | Aonde Tem Baile`
+  const socialTitle = `${event.title} | ${SITE_NAME}`
+  const shouldIndex = !id.startsWith('demo-') && !isExpiredEvent(event)
 
   return {
-    title,
+    title: event.title,
     description,
     alternates: {
       canonical: url,
     },
+    robots: {
+      index: shouldIndex,
+      follow: shouldIndex,
+    },
     openGraph: {
-      title,
+      title: socialTitle,
       description,
       url,
-      siteName: 'Aonde Tem Baile',
+      siteName: SITE_NAME,
       locale: 'pt_BR',
       type: 'website',
       images: [
@@ -125,7 +172,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: socialTitle,
       description,
       images: [image],
     },
@@ -142,7 +189,8 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
   const startDate = new Date(event.event_date)
   const endDate = event.event_end_date ? new Date(event.event_end_date) : null
-  const validEndDate = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
+  const validEndDate =
+    endDate && !Number.isNaN(endDate.getTime()) ? endDate : null
 
   const formatFullDate = (date: Date) =>
     date.toLocaleDateString('pt-BR', {
@@ -160,28 +208,150 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
   const cleanWhatsapp = event.whatsapp_info?.replace(/\D/g, '') ?? ''
   const whatsappUrl = cleanWhatsapp
-    ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(`Olá! Quero mais informações sobre o evento "${event.title}" no Aonde Tem Baile.`)}`
+    ? `https://wa.me/55${cleanWhatsapp}?text=${encodeURIComponent(
+        `Olá! Quero mais informações sobre o evento "${event.title}" no Aonde Tem Baile.`
+      )}`
     : null
+
   const currentUrl = `${SITE_URL}/evento/${event.id}`
+  const cityPath =
+    event.city && event.state ? citySeoPath(event.city, event.state) : '/'
+  const categoryPath = event.category_name
+    ? categorySeoPath(event.category_name)
+    : null
+  const image = absoluteImageUrl(event.image_url)
+  const price = ticketPriceValue(event.ticket_price)
+
+  const locationSchema: Record<string, unknown> = {
+    '@type': 'Place',
+    name:
+      event.location_name ||
+      [event.city, event.state].filter(Boolean).join(', '),
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: event.address || undefined,
+      addressLocality: event.city || undefined,
+      addressRegion: event.state || undefined,
+      addressCountry: 'BR',
+    },
+  }
+
+  if (
+    Number.isFinite(event.latitude) &&
+    Number.isFinite(event.longitude)
+  ) {
+    locationSchema.geo = {
+      '@type': 'GeoCoordinates',
+      latitude: Number(event.latitude),
+      longitude: Number(event.longitude),
+    }
+  }
+
+  const eventSchema: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    '@id': `${currentUrl}#event`,
+    name: event.title,
+    description: metadataDescription(event),
+    url: currentUrl,
+    image: [image],
+    startDate: event.event_date,
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: locationSchema,
+    inLanguage: 'pt-BR',
+  }
+
+  if (event.event_end_date) eventSchema.endDate = event.event_end_date
+  if (event.category_name) eventSchema.keywords = event.category_name
+  if (event.source_url) eventSchema.sameAs = event.source_url
+
+  if (price !== null) {
+    eventSchema.isAccessibleForFree = price === 0
+    eventSchema.offers = {
+      '@type': 'Offer',
+      url: event.source_url || currentUrl,
+      price: price.toFixed(2),
+      priceCurrency: 'BRL',
+    }
+  }
+
+  const breadcrumbItems = [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Início',
+      item: SITE_URL,
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: `Eventos em ${event.city}`,
+      item: new URL(cityPath, SITE_URL).toString(),
+    },
+    {
+      '@type': 'ListItem',
+      position: 3,
+      name: event.title,
+      item: currentUrl,
+    },
+  ]
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems,
+  }
 
   return (
     <div className={styles.container}>
-      {/* Back Button */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(eventSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema) }}
+      />
+
+      <nav
+        aria-label="Navegação estrutural"
+        style={{
+          display: 'flex',
+          gap: '0.4rem',
+          flexWrap: 'wrap',
+          marginBottom: '1rem',
+          fontSize: '0.82rem',
+          color: '#9ca3af',
+        }}
+      >
+        <Link href="/" style={{ color: '#f59e0b', textDecoration: 'none' }}>
+          Início
+        </Link>
+        <span aria-hidden="true">/</span>
+        <Link
+          href={cityPath}
+          style={{ color: '#f59e0b', textDecoration: 'none' }}
+        >
+          Eventos em {event.city}
+        </Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{event.title}</span>
+      </nav>
+
       <Link href="/" className={styles.backBtn}>
         <ArrowLeft size={16} />
         <span>Voltar para todos os eventos</span>
       </Link>
 
-      {/* Hero Banner Image */}
       <div className={styles.heroBanner}>
-        <img src={event.image_url} alt={event.title} className={styles.bannerImg} />
+        <img src={image} alt={event.title} className={styles.bannerImg} />
         <div className={styles.bannerOverlay} />
       </div>
 
-      {/* Event Header */}
       <div className={styles.titleHeader}>
         <h1 className={styles.eventTitle}>{event.title}</h1>
-        
+
         <div className={styles.metaGrid}>
           <div className={styles.metaBadge}>
             <Calendar size={16} />
@@ -190,18 +360,35 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
           <div className={styles.metaBadge}>
             <MapPin size={16} />
-            <span>{event.city}{event.state ? `, ${event.state}` : ''}</span>
+            <Link
+              href={cityPath}
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              {event.city}
+              {event.state ? `, ${event.state}` : ''}
+            </Link>
           </div>
-
         </div>
+
+        {categoryPath && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <Link
+              href={categoryPath}
+              style={{
+                color: '#fde047',
+                textDecoration: 'none',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+              }}
+            >
+              Ver mais eventos de {event.category_name}
+            </Link>
+          </div>
+        )}
       </div>
 
-      {/* Main Layout Grid */}
       <div className={styles.mainLayout}>
-        
-        {/* Left Column: Description & Map */}
         <div>
-          {/* Description */}
           <div className={styles.section}>
             <h2 className={styles.sectionTitle}>
               <span>Sobre o Evento</span>
@@ -209,7 +396,6 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             <p className={styles.descriptionText}>{event.description}</p>
           </div>
 
-          {/* Interactive OpenSource Map */}
           <div style={{ marginBottom: '1.5rem' }}>
             <EventMap
               address={event.address}
@@ -221,22 +407,28 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             />
           </div>
 
-          {/* Social Share Section */}
-          <SocialShare title={event.title} url={currentUrl} image={event.image_url} />
+          <SocialShare
+            title={event.title}
+            url={currentUrl}
+            image={event.image_url}
+          />
         </div>
 
-        {/* Right Sidebar: Contact & Info Box */}
         <div>
           <div className={styles.sidebarCard}>
-            
-            {/* Contact / original source action */}
             {whatsappUrl ? (
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-success"
-                style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
+                style={{
+                  width: '100%',
+                  padding: '0.85rem 1rem',
+                  fontSize: '0.95rem',
+                  borderRadius: '12px',
+                  marginBottom: '1.5rem',
+                }}
               >
                 <MessageCircle size={20} />
                 <span>WhatsApp para Informações</span>
@@ -245,22 +437,51 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               <a
                 href={event.source_url}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer external"
                 className="btn-primary"
-                style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem', borderRadius: '12px', marginBottom: '1.5rem' }}
+                style={{
+                  width: '100%',
+                  padding: '0.85rem 1rem',
+                  fontSize: '0.95rem',
+                  borderRadius: '12px',
+                  marginBottom: '1.5rem',
+                }}
               >
                 <ExternalLink size={20} />
                 <span>Ver publicação original</span>
               </a>
             ) : null}
 
-            {/* Event Networks / Producer Info */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
-              <p style={{ fontSize: '0.78rem', color: '#9ca3af', lineHeight: '1.45', marginBottom: '1rem' }}>
-                As informações aqui listadas são extraídas da publicação original, o <strong style={{ color: '#e5e7eb', fontWeight: 'bold' }}>Aondetembaile.com.br</strong> é apenas um meio para facilitar a busca e pesquisa do conteúdo.
+            <div
+              style={{
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                paddingTop: '1rem',
+              }}
+            >
+              <p
+                style={{
+                  fontSize: '0.78rem',
+                  color: '#9ca3af',
+                  lineHeight: '1.45',
+                  marginBottom: '1rem',
+                }}
+              >
+                As informações aqui listadas são extraídas da publicação
+                original, o{' '}
+                <strong style={{ color: '#e5e7eb', fontWeight: 'bold' }}>
+                  Aondetembaile.com.br
+                </strong>{' '}
+                é apenas um meio para facilitar a busca e pesquisa do conteúdo.
               </p>
 
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#9ca3af', marginBottom: '0.75rem' }}>
+              <div
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  color: '#9ca3af',
+                  marginBottom: '0.75rem',
+                }}
+              >
                 Redes Sociais do Evento
               </div>
 
@@ -269,7 +490,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   <a
                     href={event.source_url}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener noreferrer external"
                     className={styles.socialBtn}
                   >
                     <ExternalLink size={16} color="#f97316" />
@@ -281,7 +502,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   <a
                     href={event.facebook_url}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener noreferrer external"
                     className={styles.socialBtn}
                   >
                     <Globe size={16} color="#3b82f6" />
@@ -291,27 +512,34 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
                 {event.instagram_handle && (
                   <a
-                    href={`https://instagram.com/${event.instagram_handle.replace('@', '')}`}
+                    href={`https://instagram.com/${event.instagram_handle.replace(
+                      '@',
+                      ''
+                    )}`}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener noreferrer external"
                     className={styles.socialBtn}
                   >
                     <Share2 size={16} color="#ec4899" />
-                    <span>{event.instagram_handle.startsWith('@') ? event.instagram_handle : `@${event.instagram_handle}`}</span>
+                    <span>
+                      {event.instagram_handle.startsWith('@')
+                        ? event.instagram_handle
+                        : `@${event.instagram_handle}`}
+                    </span>
                   </a>
                 )}
 
-                {!event.facebook_url && !event.instagram_handle && !event.source_url && (
-                  <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Nenhuma rede social informada para este evento.
-                  </p>
-                )}
+                {!event.facebook_url &&
+                  !event.instagram_handle &&
+                  !event.source_url && (
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                      Nenhuma rede social informada para este evento.
+                    </p>
+                  )}
               </div>
             </div>
-
           </div>
         </div>
-
       </div>
     </div>
   )
