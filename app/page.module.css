@@ -30,6 +30,7 @@
 }
 
 .heroCarouselSlide {
+  position: relative;
   flex: 0 0 16.666666%;
   height: 100%;
   background-position: center center;
@@ -37,6 +38,11 @@
   background-repeat: no-repeat;
   filter: brightness(0.34) contrast(1.12) saturate(1.08);
   transform: scale(1.015);
+}
+
+.heroCarouselImage {
+  object-fit: cover;
+  object-position: center center;
 }
 
 @keyframes heroCarouselInfinite {

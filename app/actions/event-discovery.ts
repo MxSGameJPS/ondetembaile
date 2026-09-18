@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { geocodeLocation } from '@/lib/geocoding/server'
 import { requireAdmin } from '@/lib/auth/admin'
+import { notifyIndexNowForEvent } from '@/lib/indexnow'
+import { categorySeoPath, citySeoPath } from '@/lib/seo'
 import {
   APIFY_ESTIMATED_COST_PER_ITEM_USD,
   APIFY_FACEBOOK_RESULTS_PER_RUN,
@@ -991,7 +993,19 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
 
   revalidatePath('/admin/dashboard')
   revalidatePath('/')
+  revalidatePath('/eventos')
+  revalidatePath('/sitemap.xml')
   revalidatePath(`/evento/${approvedEvent.id}`)
+
+  if (approvedEvent.city && approvedEvent.state) {
+    revalidatePath(citySeoPath(approvedEvent.city, approvedEvent.state))
+  }
+
+  if (approvedEvent.category_id && approvedEvent.category_name) {
+    revalidatePath(categorySeoPath(approvedEvent.category_name))
+  }
+
+  await notifyIndexNowForEvent(approvedEvent)
 
   return {
     success: true as const,

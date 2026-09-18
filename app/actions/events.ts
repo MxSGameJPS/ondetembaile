@@ -5,6 +5,28 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEventSubmittedEmail, sendEventStatusEmail } from '@/lib/resend/emails'
 import { revalidatePath } from 'next/cache'
 import { geocodeLocation } from '@/lib/geocoding/server'
+import { notifyIndexNowForEvent } from '@/lib/indexnow'
+import { categorySeoPath, citySeoPath } from '@/lib/seo'
+
+function revalidatePublicEventSeo(event: {
+  id: string
+  city?: string | null
+  state?: string | null
+  category_id?: string | null
+  category_name?: string | null
+}) {
+  revalidatePath('/eventos')
+  revalidatePath('/sitemap.xml')
+  revalidatePath(`/evento/${event.id}`)
+
+  if (event.city && event.state) {
+    revalidatePath(citySeoPath(event.city, event.state))
+  }
+
+  if (event.category_id && event.category_name) {
+    revalidatePath(categorySeoPath(event.category_name))
+  }
+}
 
 export async function createEventAction(formData: {
   title: string
@@ -271,7 +293,9 @@ export async function updateEventAction(
   revalidatePath('/admin/dashboard')
   revalidatePath('/produtor/dashboard')
   revalidatePath('/')
-  revalidatePath(`/evento/${eventId}`)
+  revalidatePublicEventSeo(updatedEvent)
+  await notifyIndexNowForEvent(updatedEvent)
+
   return { success: true, event: updatedEvent }
 }
 
@@ -364,7 +388,8 @@ export async function updateEventStatusAction(
   revalidatePath('/admin/dashboard')
   revalidatePath('/produtor/dashboard')
   revalidatePath('/')
-  revalidatePath(`/evento/${eventId}`)
+  revalidatePublicEventSeo(event)
+  await notifyIndexNowForEvent(event)
 
   return { success: true, notificationSent }
 }
@@ -383,6 +408,12 @@ export async function deleteEventAction(eventId: string) {
     .eq('id', user.id)
     .single()
 
+  const { data: eventToDelete } = await supabase
+    .from('events')
+    .select('id, city, state, category_id, category_name')
+    .eq('id', eventId)
+    .maybeSingle()
+
   // Allow owner or admin to delete
   const { error } = await supabase
     .from('events')
@@ -396,5 +427,14 @@ export async function deleteEventAction(eventId: string) {
   revalidatePath('/admin/dashboard')
   revalidatePath('/produtor/dashboard')
   revalidatePath('/')
+
+  if (eventToDelete) {
+    revalidatePublicEventSeo(eventToDelete)
+    await notifyIndexNowForEvent(eventToDelete)
+  } else {
+    revalidatePath('/eventos')
+    revalidatePath('/sitemap.xml')
+  }
+
   return { success: true }
 }

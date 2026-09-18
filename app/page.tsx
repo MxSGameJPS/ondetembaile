@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { getCategoriesAction } from '@/app/actions/categories'
 import EventCard, { EventItem } from '@/components/EventCard'
@@ -463,8 +464,16 @@ export default function HomePage() {
               <div
                 key={`${image}-${index}`}
                 className={styles.heroCarouselSlide}
-                style={{ backgroundImage: `url('${image}')` }}
-              />
+              >
+                <Image
+                  src={image}
+                  alt=""
+                  fill
+                  sizes="100vw"
+                  preload={index === 0}
+                  className={styles.heroCarouselImage}
+                />
+              </div>
             ))}
           </div>
         </div>
