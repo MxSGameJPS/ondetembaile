@@ -212,7 +212,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
   const currentUrl = `${SITE_URL}/evento/${event.id}`
   const cityPath =
-    event.city && event.state ? citySeoPath(event.city, event.state) : '/'
+    event.city && event.state ? citySeoPath(event.city, event.state) : null
   const categoryPath =
     event.category_name && event.category_id
       ? categorySeoPath(event.category_name)
@@ -269,15 +269,19 @@ export default async function EventDetailPage({ params }: EventPageProps) {
       name: 'Início',
       item: SITE_URL,
     },
+    ...(cityPath
+      ? [
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: `Eventos em ${event.city}`,
+            item: new URL(cityPath, SITE_URL).toString(),
+          },
+        ]
+      : []),
     {
       '@type': 'ListItem',
-      position: 2,
-      name: `Eventos em ${event.city}`,
-      item: new URL(cityPath, SITE_URL).toString(),
-    },
-    {
-      '@type': 'ListItem',
-      position: 3,
+      position: cityPath ? 3 : 2,
       name: event.title,
       item: currentUrl,
     },
@@ -314,13 +318,17 @@ export default async function EventDetailPage({ params }: EventPageProps) {
         <Link href="/" style={{ color: '#f59e0b', textDecoration: 'none' }}>
           Início
         </Link>
-        <span aria-hidden="true">/</span>
-        <Link
-          href={cityPath}
-          style={{ color: '#f59e0b', textDecoration: 'none' }}
-        >
-          Eventos em {event.city}
-        </Link>
+        {cityPath && (
+          <>
+            <span aria-hidden="true">/</span>
+            <Link
+              href={cityPath}
+              style={{ color: '#f59e0b', textDecoration: 'none' }}
+            >
+              Eventos em {event.city}
+            </Link>
+          </>
+        )}
         <span aria-hidden="true">/</span>
         <span aria-current="page">{event.title}</span>
       </nav>
@@ -346,13 +354,20 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
           <div className={styles.metaBadge}>
             <MapPin size={16} />
-            <Link
-              href={cityPath}
-              style={{ color: 'inherit', textDecoration: 'none' }}
-            >
-              {event.city}
-              {event.state ? `, ${event.state}` : ''}
-            </Link>
+            {cityPath ? (
+              <Link
+                href={cityPath}
+                style={{ color: 'inherit', textDecoration: 'none' }}
+              >
+                {event.city}
+                {event.state ? `, ${event.state}` : ''}
+              </Link>
+            ) : (
+              <span>
+                {event.city}
+                {event.state ? `, ${event.state}` : ''}
+              </span>
+            )}
           </div>
         </div>
 
