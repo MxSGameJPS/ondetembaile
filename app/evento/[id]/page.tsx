@@ -15,7 +15,7 @@ import {
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  DEFAULT_LOGO,
+  DEFAULT_OG_IMAGE,
   SITE_NAME,
   SITE_URL,
   categorySeoPath,
@@ -60,23 +60,44 @@ const getEventById = cache(async (id: string) => {
     .from('events')
     .select('*')
     .eq('id', id)
-    .eq('status', 'approved')
     .single()
 
   if (error || !data) {
     return null
   }
 
-  return data
+  if (data.status === 'approved') {
+    return data
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return null
+  }
+
+  if (data.producer_id === user.id) {
+    return data
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  return profile && ['admin', 'superadmin'].includes(profile.role) ? data : null
 })
 
 function absoluteImageUrl(imageUrl?: string | null) {
-  if (!imageUrl) return DEFAULT_LOGO
+  if (!imageUrl) return DEFAULT_OG_IMAGE
 
   try {
     return new URL(imageUrl, SITE_URL).toString()
   } catch {
-    return DEFAULT_LOGO
+    return DEFAULT_OG_IMAGE
   }
 }
 
@@ -120,7 +141,7 @@ export async function generateMetadata({
   const image = absoluteImageUrl(event.image_url)
   const description = metadataDescription(event)
   const socialTitle = `${event.title} | ${SITE_NAME}`
-  const shouldIndex = !id.startsWith('demo-')
+  const shouldIndex = !id.startsWith('demo-') && event.status === 'approved'
 
   return {
     title: event.title,
