@@ -1001,7 +1001,7 @@ export async function approveDiscoveryCandidateAction(candidateId: string) {
     revalidatePath(citySeoPath(approvedEvent.city, approvedEvent.state))
   }
 
-  if (approvedEvent.category_name) {
+  if (approvedEvent.category_id && approvedEvent.category_name) {
     revalidatePath(categorySeoPath(approvedEvent.category_name))
   }
 
