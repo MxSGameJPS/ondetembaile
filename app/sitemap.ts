@@ -54,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const [events, categories] = await Promise.all([
-      getFutureApprovedEvents({ limit: 1000 }),
+      getFutureApprovedEvents({ limit: 10000 }),
       getSeoCategories(),
     ])
 
