@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://aondetembaile.com.br'),
   title: 'Aonde Tem Baile | Divulgação de Eventos e Festas Regionais pelo Brasil',
   description:
     'Encontre e divulgue bailes, festas, shows e eventos regionais perto de você. Plataforma completa para produtores de eventos.',
@@ -35,11 +36,19 @@ export default function RootLayout({
               🪩 Aonde Tem Baile — O portal de eventos regionais do Brasil
             </p>
             <p>
-              © {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados. |{' '}
+              © {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+              <Link href="/quemsomos" style={{ color: '#f59e0b', textDecoration: 'none' }}>
+                Quem somos
+              </Link>
+              <Link href="/contato-e-suporte" style={{ color: '#f59e0b', textDecoration: 'none' }}>
+                Contato e Suporte
+              </Link>
               <Link href="/termos-de-uso" style={{ color: '#f59e0b', textDecoration: 'none' }}>
                 Termos de Uso e Privacidade
               </Link>
-            </p>
+            </div>
           </div>
         </footer>
       </body>
