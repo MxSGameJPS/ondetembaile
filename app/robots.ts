@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/seo'
 
-const blockedPaths = ['/admin/', '/produtor/', '/api/', '/login']
+const blockedPaths = ['/admin/', '/produtor/', '/api/']
 
 export default function robots(): MetadataRoute.Robots {
   return {
