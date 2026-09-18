@@ -300,6 +300,8 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         scanned: number
         matched: number
         usedDataEndpoint: boolean
+        usedHtmlEventPages: boolean
+        eventLinksFound: number
         buildId: string | null
         pageUrl: string
       }
@@ -347,6 +349,8 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         scanned: roleAgoraResult.scanned,
         matched: roleAgoraResult.events.length,
         usedDataEndpoint: roleAgoraResult.usedDataEndpoint,
+        usedHtmlEventPages: roleAgoraResult.usedHtmlEventPages,
+        eventLinksFound: roleAgoraResult.eventLinksFound,
         buildId: roleAgoraResult.buildId,
         pageUrl: roleAgoraResult.pageUrl,
       }
