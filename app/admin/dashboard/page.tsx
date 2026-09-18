@@ -395,25 +395,95 @@ export default function AdminDashboardPage() {
   // Event Approval / Rejection Handler
   const handleApprove = async (eventId: string) => {
     const res = await updateEventStatusAction(eventId, 'approved')
-    if (res.success) {
-      setEvents(events.map((e) => (e.id === eventId ? { ...e, status: 'approved' } : e)))
-      alert('Evento aprovado com sucesso! O produtor foi notificado por e-mail.')
-    } else {
+
+    if (!res.success) {
       alert(res.error || 'Erro ao aprovar evento.')
+      return
     }
+
+    setEvents((currentEvents) =>
+      currentEvents.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              status: 'approved',
+              rejection_reason: null,
+              rejection_is_permanent: false,
+            }
+          : event
+      )
+    )
+
+    alert(
+      res.notificationSent
+        ? 'Evento aprovado com sucesso! O produtor foi notificado por e-mail.'
+        : 'Evento aprovado, mas o e-mail ao produtor não pôde ser enviado. Verifique a configuração server-side do Supabase/Resend.'
+    )
   }
 
-  const handleReject = async (eventId: string) => {
-    const reason = prompt('Informe o motivo da recusa do evento (será enviado por e-mail ao produtor):')
-    if (reason === null) return // Cancelled
-
-    const res = await updateEventStatusAction(eventId, 'rejected', reason)
-    if (res.success) {
-      setEvents(events.map((e) => (e.id === eventId ? { ...e, status: 'rejected', rejection_reason: reason } : e)))
-      alert('Evento recusado. E-mail de notificação enviado ao produtor.')
-    } else {
-      alert(res.error || 'Erro ao recusar evento.')
+  const handleReject = async (eventId: string, permanent = false) => {
+    if (permanent && adminRole !== 'superadmin') {
+      alert('Apenas o SuperAdmin pode recusar um evento permanentemente.')
+      return
     }
+
+    const reason = prompt(
+      permanent
+        ? 'Informe o motivo da recusa definitiva do evento:'
+        : 'Informe o motivo da recusa do evento (o produtor poderá corrigir e reenviar):'
+    )
+
+    if (reason === null) return
+
+    const cleanReason = reason.trim()
+    if (!cleanReason) {
+      alert('Informe o motivo da recusa para orientar o produtor.')
+      return
+    }
+
+    if (
+      permanent &&
+      !confirm(
+        'Confirmar recusa permanente? O produtor não poderá mais editar ou reenviar este evento pelo painel.'
+      )
+    ) {
+      return
+    }
+
+    const res = await updateEventStatusAction(
+      eventId,
+      'rejected',
+      cleanReason,
+      { permanent }
+    )
+
+    if (!res.success) {
+      alert(res.error || 'Erro ao recusar evento.')
+      return
+    }
+
+    setEvents((currentEvents) =>
+      currentEvents.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              status: 'rejected',
+              rejection_reason: cleanReason,
+              rejection_is_permanent: permanent,
+            }
+          : event
+      )
+    )
+
+    const decisionText = permanent
+      ? 'Evento recusado permanentemente.'
+      : 'Evento recusado e liberado para correção pelo produtor.'
+
+    alert(
+      res.notificationSent
+        ? `${decisionText} O produtor foi notificado por e-mail.`
+        : `${decisionText} O e-mail ao produtor não pôde ser enviado; verifique a configuração server-side do Supabase/Resend.`
+    )
   }
 
   const handleDelete = async (eventId: string) => {
@@ -568,6 +638,18 @@ export default function AdminDashboardPage() {
                         <XCircle size={14} />
                         <span>Recusar</span>
                       </button>
+
+                      {adminRole === 'superadmin' && (
+                        <button
+                          onClick={() => handleReject(event.id, true)}
+                          className="btn-outline"
+                          style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.45)' }}
+                          title="Recusar definitivamente e bloquear novas edições pelo produtor"
+                        >
+                          <AlertOctagon size={14} />
+                          <span>Recusa permanente</span>
+                        </button>
+                      )}
                     </div>
                   }
                 />
@@ -1017,6 +1099,17 @@ export default function AdminDashboardPage() {
                       style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}
                     >
                       Recusar
+                    </button>
+                  )}
+
+                  {adminRole === 'superadmin' && !event.rejection_is_permanent && (
+                    <button
+                      onClick={() => handleReject(event.id, true)}
+                      className="btn-outline"
+                      style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.45)' }}
+                      title="Recusar definitivamente e bloquear novas edições pelo produtor"
+                    >
+                      Recusa permanente
                     </button>
                   )}
                   <button
