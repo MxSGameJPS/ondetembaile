@@ -82,7 +82,6 @@ export async function notifyIndexNowForEvent(event: IndexableEvent) {
   const urls = [
     absoluteUrl(`/evento/${event.id}`),
     absoluteUrl('/eventos'),
-    absoluteUrl('/sitemap.xml'),
   ]
 
   if (event.city && event.state) {
