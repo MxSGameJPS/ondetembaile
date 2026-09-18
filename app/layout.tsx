@@ -126,6 +126,9 @@ export default function RootLayout({
               © {new Date().getFullYear()} Aonde Tem Baile. Todos os direitos reservados.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+              <Link href="/eventos" style={{ color: '#f59e0b', textDecoration: 'none' }}>
+                Agenda de eventos
+              </Link>
               <Link href="/quemsomos" style={{ color: '#f59e0b', textDecoration: 'none' }}>
                 Quem somos
               </Link>
