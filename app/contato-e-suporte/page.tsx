@@ -33,7 +33,7 @@ export default async function ContatoSuportePage({
             relacionados ao Aonde Tem Baile.
           </p>
 
-          <div className={styles.contactCard}>
+          {/* <div className={styles.contactCard}>
             <Mail size={20} aria-hidden="true" />
             <div>
               <strong>E-mail</strong>
@@ -41,7 +41,7 @@ export default async function ContatoSuportePage({
                 alexmobihaus@gmail.com
               </a>
             </div>
-          </div>
+          </div> */}
 
           <Link href="/quemsomos" className={styles.aboutLink}>
             Conheça também quem somos
