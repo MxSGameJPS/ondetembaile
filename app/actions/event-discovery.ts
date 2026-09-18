@@ -295,6 +295,15 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
         monthlyBudgetUsd: number
       }
     | null = null
+  let roleAgoraUsage:
+    | {
+        scanned: number
+        matched: number
+        usedDataEndpoint: boolean
+        buildId: string | null
+        pageUrl: string
+      }
+    | null = null
 
   const facebookRequested = sources.includes('facebook')
   const roleAgoraRequested = sources.includes('roleagora')
@@ -334,6 +343,13 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
       discovered.push(...roleAgoraResult.events)
       searched += roleAgoraResult.scanned
       warnings.push(...roleAgoraResult.warnings)
+      roleAgoraUsage = {
+        scanned: roleAgoraResult.scanned,
+        matched: roleAgoraResult.events.length,
+        usedDataEndpoint: roleAgoraResult.usedDataEndpoint,
+        buildId: roleAgoraResult.buildId,
+        pageUrl: roleAgoraResult.pageUrl,
+      }
       completedPipelines += 1
     } catch (error) {
       console.error('Erro na descoberta estruturada do Rolê Agora:', error)
@@ -488,6 +504,7 @@ export async function discoverEventsAction(input: DiscoverEventsInput) {
     warnings,
     window,
     apifyUsage,
+    roleAgoraUsage,
   }
 }
 
