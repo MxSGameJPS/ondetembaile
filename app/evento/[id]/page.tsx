@@ -119,7 +119,12 @@ function ticketPriceValue(value?: string | null) {
   const match = normalized.match(/\d{1,6}(?:[.,]\d{1,2})?/)
   if (!match) return null
 
-  const parsed = Number(match[0].replace('.', '').replace(',', '.'))
+  const numeric = match[0]
+  const decimalSeparator = numeric.includes(',') ? ',' : numeric.includes('.') ? '.' : null
+  const normalizedNumber = decimalSeparator
+    ? numeric.replace(decimalSeparator, '.')
+    : numeric
+  const parsed = Number(normalizedNumber)
   return Number.isFinite(parsed) ? parsed : null
 }
 
