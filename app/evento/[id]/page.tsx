@@ -213,9 +213,10 @@ export default async function EventDetailPage({ params }: EventPageProps) {
   const currentUrl = `${SITE_URL}/evento/${event.id}`
   const cityPath =
     event.city && event.state ? citySeoPath(event.city, event.state) : '/'
-  const categoryPath = event.category_name
-    ? categorySeoPath(event.category_name)
-    : null
+  const categoryPath =
+    event.category_name && event.category_id
+      ? categorySeoPath(event.category_name)
+      : null
   const image = absoluteImageUrl(event.image_url)
   const locationSchema: Record<string, unknown> = {
     '@type': 'Place',
