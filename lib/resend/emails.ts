@@ -8,6 +8,15 @@ function getResendClient() {
 const SENDER_EMAIL = 'Aonde Tem Baile <contato@aondetembaile.com.br>';
 const SITE_URL = 'https://aondetembaile.com.br';
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /**
  * Common HTML wrapper layout for all brand emails
  */
@@ -226,13 +235,20 @@ export async function sendEventStatusEmail(
   producerName: string,
   eventTitle: string,
   status: 'approved' | 'rejected',
-  rejectionReason?: string
+  rejectionReason?: string,
+  permanentRejection = false
 ) {
   try {
     const isApproved = status === 'approved';
+    const safeProducerName = escapeHtml(producerName);
+    const safeEventTitle = escapeHtml(eventTitle);
+    const safeReason = rejectionReason ? escapeHtml(rejectionReason) : '';
+
     const subject = isApproved
       ? `🎉 Seu evento "${eventTitle}" foi APROVADO!`
-      : `⚠️ Atualização sobre seu evento "${eventTitle}"`;
+      : permanentRejection
+        ? `⛔ Seu evento "${eventTitle}" foi recusado definitivamente`
+        : `⚠️ Atualização sobre seu evento "${eventTitle}"`;
 
     const htmlContent = isApproved
       ? getEmailWrapper(`
@@ -243,27 +259,26 @@ export async function sendEventStatusEmail(
           </div>
 
           <h1 style="font-size: 22px; font-weight: 800; color: #ffffff; margin: 0 0 12px 0; text-align: center;">
-            Parabéns, ${producerName}!
+            Parabéns, ${safeProducerName}!
           </h1>
 
           <p style="font-size: 15px; color: #d1d5db; line-height: 1.6; margin: 0 0 20px 0; text-align: center;">
-            Seu evento <strong>"${eventTitle}"</strong> foi aprovado e já está publicado no <strong>Aonde Tem Baile</strong>!
+            Seu evento <strong>"${safeEventTitle}"</strong> foi aprovado e já está publicado no <strong>Aonde Tem Baile</strong>!
           </p>
 
-          <!-- Approved Box -->
           <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background: #1c1c20; border-radius: 12px; padding: 20px; border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 24px;">
             <tr>
               <td>
                 <div style="font-size: 11px; text-transform: uppercase; color: #9ca3af; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px;">
-                  Evento em Destaque:
+                  Evento:
                 </div>
                 <div style="font-size: 18px; font-weight: 800; color: #ffffff; margin-bottom: 12px;">
-                  "${eventTitle}"
+                  "${safeEventTitle}"
                 </div>
-                
+
                 <div style="background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; padding: 12px 14px; border-radius: 6px;">
                   <span style="font-size: 13px; color: #d1fae5;">
-                    <strong>Status:</strong> <span style="color: #10b981; font-weight: 800;">Publicado e Ativo no Site</span>
+                    <strong>Status:</strong> <span style="color: #10b981; font-weight: 800;">Publicado e ativo no site</span>
                   </span>
                 </div>
               </td>
@@ -271,20 +286,19 @@ export async function sendEventStatusEmail(
           </table>
 
           <p style="font-size: 14px; color: #9ca3af; line-height: 1.6; margin: 0 0 24px 0; text-align: center;">
-            💡 <strong>Dica do Produtor:</strong> Compartilhe o link do evento no seu WhatsApp, Instagram e redes sociais para atrair ainda mais público!
+            Compartilhe o evento nas suas redes sociais para ajudar o público a encontrá-lo.
           </p>
 
-          <!-- CTA Button -->
           <div style="text-align: center;">
             <a href="${SITE_URL}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; font-size: 15px; font-weight: 800; text-decoration: none; padding: 14px 28px; border-radius: 10px; display: inline-block; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);">
-              ✨ Ver Evento no Site
+              ✨ Acessar o Aonde Tem Baile
             </a>
           </div>
         `)
       : getEmailWrapper(`
           <div style="text-align: center; margin-bottom: 24px;">
             <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #ef4444; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.5px;">
-              ⚠️ Evento Precisa de Ajustes
+              ${permanentRejection ? '⛔ Evento Recusado Definitivamente' : '⚠️ Evento Precisa de Ajustes'}
             </span>
           </div>
 
@@ -293,10 +307,12 @@ export async function sendEventStatusEmail(
           </h1>
 
           <p style="font-size: 15px; color: #d1d5db; line-height: 1.6; margin: 0 0 20px 0; text-align: center;">
-            Olá <strong>${producerName}</strong>, o evento <strong>"${eventTitle}"</strong> não pôde ser aprovado neste momento.
+            Olá <strong>${safeProducerName}</strong>, o evento <strong>"${safeEventTitle}"</strong>
+            ${permanentRejection
+              ? ' foi recusado definitivamente pela moderação.'
+              : ' não pôde ser aprovado neste momento.'}
           </p>
 
-          <!-- Rejected Reason Box -->
           <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background: #1c1c20; border-radius: 12px; padding: 20px; border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 24px;">
             <tr>
               <td>
@@ -304,29 +320,28 @@ export async function sendEventStatusEmail(
                   Evento:
                 </div>
                 <div style="font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 14px;">
-                  "${eventTitle}"
+                  "${safeEventTitle}"
                 </div>
-                
-                ${
-                  rejectionReason
-                    ? `<div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 14px; border-radius: 6px;">
-                        <div style="font-size: 12px; color: #fca5a5; font-weight: 700; margin-bottom: 4px;">Motivo informado pela moderação:</div>
-                        <div style="font-size: 14px; color: #fee2e2;">${rejectionReason}</div>
-                       </div>`
-                    : ''
-                }
+
+                ${safeReason
+                  ? `<div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 14px; border-radius: 6px;">
+                      <div style="font-size: 12px; color: #fca5a5; font-weight: 700; margin-bottom: 4px;">Motivo informado pela moderação:</div>
+                      <div style="font-size: 14px; color: #fee2e2;">${safeReason}</div>
+                    </div>`
+                  : ''}
               </td>
             </tr>
           </table>
 
           <p style="font-size: 14px; color: #9ca3af; line-height: 1.6; margin: 0 0 24px 0; text-align: center;">
-            Você pode corrigir ou atualizar as informações no seu painel e submeter o evento novamente para aprovação.
+            ${permanentRejection
+              ? 'Esta decisão bloqueia novas edições pelo painel do produtor. Se precisar esclarecer a decisão, entre em contato com o suporte.'
+              : 'Corrija as informações indicadas no seu painel. Ao salvar a edição, o evento voltará automaticamente para uma nova análise.'}
           </p>
 
-          <!-- CTA Button -->
           <div style="text-align: center;">
-            <a href="${SITE_URL}/produtor/dashboard" style="background: #ef4444; color: #ffffff; font-size: 14px; font-weight: 800; text-decoration: none; padding: 13px 26px; border-radius: 10px; display: inline-block;">
-              ✏️ Ajustar Evento no Painel
+            <a href="${SITE_URL}/${permanentRejection ? 'contato-e-suporte' : 'produtor/dashboard'}" style="background: #ef4444; color: #ffffff; font-size: 14px; font-weight: 800; text-decoration: none; padding: 13px 26px; border-radius: 10px; display: inline-block;">
+              ${permanentRejection ? '💬 Falar com o Suporte' : '✏️ Ajustar Evento no Painel'}
             </a>
           </div>
         `);
@@ -337,6 +352,7 @@ export async function sendEventStatusEmail(
       subject,
       html: htmlContent,
     });
+
     return { success: true, data };
   } catch (error) {
     console.error('Erro ao enviar e-mail de alteração de status:', error);
