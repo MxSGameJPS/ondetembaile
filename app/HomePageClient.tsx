@@ -128,6 +128,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<EventItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showCitySuggestions, setShowCitySuggestions] = useState(false)
   const [citySuggestionsLoading, setCitySuggestionsLoading] = useState(false)
@@ -145,6 +146,14 @@ export default function HomePage() {
   const supabase = createClient()
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 60_000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
     async function loadData() {
       setLoading(true)
       
@@ -154,16 +163,23 @@ export default function HomePage() {
         setCategories(catRes.data)
       }
 
-      // Load Events
+      // Load only events that are upcoming or still in progress.
+      // If an end date exists, it defines when the event expires; otherwise
+      // the start date is used as the expiration boundary.
+      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('status', 'approved')
+        .or(
+          `event_end_date.gte.${now},and(event_end_date.is.null,event_date.gte.${now})`
+        )
         .order('event_date', { ascending: true })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setEvents(data)
       } else {
+        console.error('Não foi possível carregar os eventos ativos:', error)
         setEvents(DEMO_EVENTS)
       }
       setLoading(false)
@@ -390,8 +406,18 @@ export default function HomePage() {
     setCitySuggestions([])
   }
 
-  // Filter events by City search, Category & Period
+  // Filter events by expiration, City search, Category & Period
   const filteredEvents = events.filter((e) => {
+    const startTime = new Date(e.event_date).getTime()
+    const parsedEndTime = e.event_end_date
+      ? new Date(e.event_end_date).getTime()
+      : startTime
+    const effectiveEndTime = Number.isNaN(parsedEndTime) ? startTime : parsedEndTime
+
+    // Client-side guard keeps the feed correct even when the page stays open
+    // while an event reaches its end time.
+    if (Number.isNaN(effectiveEndTime) || effectiveEndTime < currentTime) return false
+
     const cityQuery = normalizeCity(searchCity)
     const directCityMatch =
       cityQuery === '' || normalizeCity(e.city).includes(cityQuery)
