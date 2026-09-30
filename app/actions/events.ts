@@ -359,19 +359,26 @@ export async function updateEventStatusAction(
   }
 
   let notificationSent = false
+  let notificationError: string | null = null
   const adminClient = createAdminClient()
 
   if (!adminClient) {
-    console.error(
-      'E-mail de moderação não enviado: SUPABASE_SERVICE_ROLE_KEY não está configurada no servidor.'
-    )
+    notificationError =
+      'SUPABASE_SERVICE_ROLE_KEY ou NEXT_PUBLIC_SUPABASE_URL não está configurada no servidor.'
+    console.error('E-mail de moderação não enviado:', notificationError)
   } else {
     const { data: producerUser, error: producerError } =
       await adminClient.auth.admin.getUserById(event.producer_id)
 
     if (producerError) {
+      notificationError = `Supabase Auth não encontrou o produtor: ${producerError.message}`
       console.error('Erro ao buscar e-mail do produtor no Supabase Auth:', producerError)
-    } else if (producerUser.user?.email) {
+    } else if (!producerUser.user?.email) {
+      notificationError = 'O produtor não possui e-mail no Supabase Auth.'
+      console.error('E-mail de moderação não enviado:', notificationError, {
+        producerId: event.producer_id,
+      })
+    } else {
       const emailResult = await sendEventStatusEmail(
         producerUser.user.email,
         event.profiles?.name || 'Produtor',
@@ -382,6 +389,14 @@ export async function updateEventStatusAction(
       )
 
       notificationSent = emailResult.success
+      if (!emailResult.success) {
+        notificationError =
+          typeof emailResult.error === 'string'
+            ? emailResult.error
+            : emailResult.error instanceof Error
+              ? emailResult.error.message
+              : 'O Resend recusou o envio do e-mail.'
+      }
     }
   }
 
@@ -391,7 +406,7 @@ export async function updateEventStatusAction(
   revalidatePublicEventSeo(event)
   await notifyIndexNowForEvent(event)
 
-  return { success: true, notificationSent }
+  return { success: true, notificationSent, notificationError }
 }
 
 export async function deleteEventAction(eventId: string) {
