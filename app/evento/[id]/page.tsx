@@ -107,18 +107,26 @@ function normalizeInstagram(value?: string | null) {
   const raw = value.trim()
   if (!raw) return null
 
-  // Accept @usuario, usuario or a full Instagram URL copied from the app/web.
-  const withoutProtocol = raw.replace(/^https?:\/\//i, '')
-  const instagramMatch = withoutProtocol.match(/^(?:www\.)?instagram\.com\/([^/?#]+)/i)
-  const username = (instagramMatch?.[1] || raw)
-    .replace(/^@+/, '')
-    .split(/[/?#]/)[0]
-    .trim()
+  // Full Instagram URLs may point to a profile OR directly to a post/reel.
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw)
+      if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return null
 
+      // Remove tracking parameters while preserving the actual Instagram path.
+      return {
+        label: 'Instagram',
+        url: `https://www.instagram.com${url.pathname.replace(/\/+$/, '')}/`,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const username = raw.replace(/^@+/, '').split(/[/?#]/)[0].trim()
   if (!username) return null
 
   return {
-    username,
     label: `@${username}`,
     url: `https://www.instagram.com/${encodeURIComponent(username)}/`,
   }
