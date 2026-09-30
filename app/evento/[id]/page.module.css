@@ -122,6 +122,27 @@
   color: #d1d5db;
   line-height: 1.7;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 1rem;
+    overflow-x: hidden;
+  }
+
+  .section {
+    min-width: 0;
+    padding: 1.25rem;
+    overflow: hidden;
+  }
+
+  .descriptionText {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .sidebarCard {
