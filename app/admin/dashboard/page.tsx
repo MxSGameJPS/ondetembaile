@@ -420,7 +420,7 @@ export default function AdminDashboardPage() {
     alert(
       res.notificationSent
         ? 'Evento aprovado com sucesso! O produtor foi notificado por e-mail.'
-        : 'Evento aprovado, mas o e-mail ao produtor não pôde ser enviado. Verifique a configuração server-side do Supabase/Resend.'
+        : `Evento aprovado, mas o e-mail ao produtor não pôde ser enviado. Motivo: ${res.notificationError || 'erro não identificado'}`
     )
   }
 
@@ -485,7 +485,7 @@ export default function AdminDashboardPage() {
     alert(
       res.notificationSent
         ? `${decisionText} O produtor foi notificado por e-mail.`
-        : `${decisionText} O e-mail ao produtor não pôde ser enviado; verifique a configuração server-side do Supabase/Resend.`
+        : `${decisionText} O e-mail ao produtor não pôde ser enviado. Motivo: ${res.notificationError || 'erro não identificado'}`
     )
   }
 
