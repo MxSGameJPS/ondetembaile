@@ -300,10 +300,21 @@ export default function EditEventModal({
               </div>
 
               <div className="form-group">
+                <label className="form-label">Facebook do Evento (Opcional)</label>
+                <input
+                  type="url"
+                  placeholder="https://www.facebook.com/..."
+                  className="form-input"
+                  value={formData.facebook_url}
+                  onChange={(e) => setFormData({ ...formData, facebook_url: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Instagram do Evento (Opcional)</label>
                 <input
                   type="text"
-                  placeholder="@osserranos"
+                  placeholder="@usuario ou https://www.instagram.com/..."
                   className="form-input"
                   value={formData.instagram_handle}
                   onChange={(e) => setFormData({ ...formData, instagram_handle: e.target.value })}
