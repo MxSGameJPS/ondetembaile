@@ -346,12 +346,20 @@ export async function sendEventStatusEmail(
           </div>
         `);
 
-    const data = await getResendClient().emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: SENDER_EMAIL,
       to: [toEmail],
       subject,
       html: htmlContent,
     });
+
+    if (error) {
+      console.error('Resend recusou o e-mail de alteração de status:', error);
+      return {
+        success: false,
+        error: error.message || 'O Resend recusou o envio do e-mail.',
+      };
+    }
 
     return { success: true, data };
   } catch (error) {
