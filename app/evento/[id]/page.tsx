@@ -101,6 +101,29 @@ function absoluteImageUrl(imageUrl?: string | null) {
   }
 }
 
+function normalizeInstagram(value?: string | null) {
+  if (!value) return null
+
+  const raw = value.trim()
+  if (!raw) return null
+
+  // Accept @usuario, usuario or a full Instagram URL copied from the app/web.
+  const withoutProtocol = raw.replace(/^https?:\/\//i, '')
+  const instagramMatch = withoutProtocol.match(/^(?:www\.)?instagram\.com\/([^/?#]+)/i)
+  const username = (instagramMatch?.[1] || raw)
+    .replace(/^@+/, '')
+    .split(/[/?#]/)[0]
+    .trim()
+
+  if (!username) return null
+
+  return {
+    username,
+    label: `@${username}`,
+    url: `https://www.instagram.com/${encodeURIComponent(username)}/`,
+  }
+}
+
 function metadataDescription(event: {
   description?: string | null
   city?: string | null
@@ -211,6 +234,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
     : null
 
   const currentUrl = `${SITE_URL}/evento/${event.id}`
+  const instagram = normalizeInstagram(event.instagram_handle)
   const cityPath =
     event.city && event.state ? citySeoPath(event.city, event.state) : null
   const categoryPath =
@@ -511,22 +535,15 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   </a>
                 )}
 
-                {event.instagram_handle && (
+                {instagram && (
                   <a
-                    href={`https://instagram.com/${event.instagram_handle.replace(
-                      '@',
-                      ''
-                    )}`}
+                    href={instagram.url}
                     target="_blank"
                     rel="noopener noreferrer external"
                     className={styles.socialBtn}
                   >
                     <Share2 size={16} color="#ec4899" />
-                    <span>
-                      {event.instagram_handle.startsWith('@')
-                        ? event.instagram_handle
-                        : `@${event.instagram_handle}`}
-                    </span>
+                    <span>{instagram.label}</span>
                   </a>
                 )}
 
