@@ -44,6 +44,7 @@ export default function EventCard({ event, showStatus = false, adminActions }: E
 
   const formatEventDate = (date: Date, includeWeekday = true) =>
     date.toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
       ...(includeWeekday ? { weekday: 'short' as const } : {}),
       day: '2-digit',
       month: 'short',
