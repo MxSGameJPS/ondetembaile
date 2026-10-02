@@ -222,6 +222,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
   const formatFullDate = (date: Date) =>
     date.toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
       weekday: 'long',
       day: '2-digit',
       month: 'long',
