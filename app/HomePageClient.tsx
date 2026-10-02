@@ -406,7 +406,21 @@ export default function HomePage() {
     setCitySuggestions([])
   }
 
-  // Filter events by expiration, City search, Category & Period
+  // Filter events by expiration, City search, Category & Period.
+  // Results from the searched city always come before nearby cities.
+  const cityQuery = normalizeCity(searchCity)
+  const selectedState = selectedCityState?.toUpperCase() ?? null
+
+  const isDirectCityMatch = (event: EventItem) => {
+    if (!cityQuery) return true
+
+    const matchesCity = normalizeCity(event.city).includes(cityQuery)
+    const matchesState =
+      !selectedState || (event.state || '').toUpperCase() === selectedState
+
+    return matchesCity && matchesState
+  }
+
   const filteredEvents = events.filter((e) => {
     const startTime = new Date(e.event_date).getTime()
     const parsedEndTime = e.event_end_date
@@ -418,9 +432,7 @@ export default function HomePage() {
     // while an event reaches its end time.
     if (Number.isNaN(effectiveEndTime) || effectiveEndTime < currentTime) return false
 
-    const cityQuery = normalizeCity(searchCity)
-    const directCityMatch =
-      cityQuery === '' || normalizeCity(e.city).includes(cityQuery)
+    const directCityMatch = isDirectCityMatch(e)
 
     const eventCityKey = `${normalizeCity(e.city)}|${(e.state || 'RS').toUpperCase()}`
     const fallbackCityCenter = eventCityCenters[eventCityKey]
@@ -466,6 +478,17 @@ export default function HomePage() {
     }
 
     return true
+  }).sort((a, b) => {
+    if (cityQuery) {
+      const aIsDirect = isDirectCityMatch(a)
+      const bIsDirect = isDirectCityMatch(b)
+
+      if (aIsDirect !== bIsDirect) {
+        return aIsDirect ? -1 : 1
+      }
+    }
+
+    return new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
   })
 
   const clearFilters = () => {
