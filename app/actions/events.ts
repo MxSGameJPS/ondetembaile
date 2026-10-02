@@ -43,7 +43,7 @@ export async function createEventAction(formData: {
   event_date: string
   event_end_date?: string
   ticket_price?: string
-  whatsapp_info: string
+  whatsapp_info?: string
   facebook_url?: string
   instagram_handle?: string
 }) {
@@ -116,7 +116,7 @@ export async function createEventAction(formData: {
       event_date: formData.event_date,
       event_end_date: formData.event_end_date || null,
       ticket_price: formData.ticket_price || 'Consultar',
-      whatsapp_info: formData.whatsapp_info,
+      whatsapp_info: formData.whatsapp_info?.trim() || '',
       facebook_url: formData.facebook_url || null,
       instagram_handle: formData.instagram_handle || null,
       status: 'pending',
@@ -156,7 +156,7 @@ export async function updateEventAction(
     event_date: string
     event_end_date?: string
     ticket_price?: string
-    whatsapp_info: string
+    whatsapp_info?: string
     facebook_url?: string
     instagram_handle?: string
     status?: 'pending' | 'approved' | 'rejected'
@@ -257,7 +257,7 @@ export async function updateEventAction(
     event_date: formData.event_date,
     event_end_date: formData.event_end_date || null,
     ticket_price: formData.ticket_price || 'Consultar',
-    whatsapp_info: formData.whatsapp_info,
+    whatsapp_info: formData.whatsapp_info?.trim() || '',
     facebook_url: formData.facebook_url || null,
     instagram_handle: formData.instagram_handle || null,
     updated_at: new Date().toISOString(),
