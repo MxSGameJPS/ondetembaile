@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { geocodeLocation } from '@/lib/geocoding/server'
 import { notifyIndexNowForEvent } from '@/lib/indexnow'
 import { categorySeoPath, citySeoPath } from '@/lib/seo'
+import { brazilLocalToIso } from '@/lib/datetime'
 
 function revalidatePublicEventSeo(event: {
   id: string
@@ -66,9 +67,11 @@ export async function createEventAction(formData: {
     return { success: false, error: 'Sua conta está bloqueada ou banida de cadastrar eventos.' }
   }
 
-  const startTime = new Date(formData.event_date).getTime()
+  const eventDate = brazilLocalToIso(formData.event_date)
+  const eventEndDate = brazilLocalToIso(formData.event_end_date)
+  const startTime = eventDate ? new Date(eventDate).getTime() : NaN
   const endTime = formData.event_end_date
-    ? new Date(formData.event_end_date).getTime()
+    ? eventEndDate ? new Date(eventEndDate).getTime() : NaN
     : null
 
   if (Number.isNaN(startTime)) {
@@ -113,8 +116,8 @@ export async function createEventAction(formData: {
       latitude: Number.isFinite(latitude) ? latitude : null,
       longitude: Number.isFinite(longitude) ? longitude : null,
       image_url: formData.image_url,
-      event_date: formData.event_date,
-      event_end_date: formData.event_end_date || null,
+      event_date: eventDate,
+      event_end_date: eventEndDate,
       ticket_price: formData.ticket_price || 'Consultar',
       whatsapp_info: formData.whatsapp_info?.trim() || '',
       facebook_url: formData.facebook_url || null,
@@ -210,9 +213,11 @@ export async function updateEventAction(
     }
   }
 
-  const startTime = new Date(formData.event_date).getTime()
+  const eventDate = brazilLocalToIso(formData.event_date)
+  const eventEndDate = brazilLocalToIso(formData.event_end_date)
+  const startTime = eventDate ? new Date(eventDate).getTime() : NaN
   const endTime = formData.event_end_date
-    ? new Date(formData.event_end_date).getTime()
+    ? eventEndDate ? new Date(eventEndDate).getTime() : NaN
     : null
 
   if (Number.isNaN(startTime)) {
@@ -254,8 +259,8 @@ export async function updateEventAction(
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
     image_url: formData.image_url,
-    event_date: formData.event_date,
-    event_end_date: formData.event_end_date || null,
+    event_date: eventDate,
+    event_end_date: eventEndDate,
     ticket_price: formData.ticket_price || 'Consultar',
     whatsapp_info: formData.whatsapp_info?.trim() || '',
     facebook_url: formData.facebook_url || null,

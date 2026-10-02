@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { EventItem } from '@/components/EventCard'
 import { updateEventAction } from '@/app/actions/events'
+import { isoToBrazilLocal } from '@/lib/datetime'
 import { X, Edit3, Save, MapPin, Calendar, Ticket, Tag, Image, Phone, Globe } from 'lucide-react'
 import styles from './EditEventModal.module.css'
 
@@ -18,14 +19,6 @@ interface EditEventModalProps {
   isAdminView?: boolean
   onClose: () => void
   onSaveSuccess: (updatedEvent: EventItem) => void
-}
-
-function toDatetimeLocal(isoStr?: string | null): string {
-  if (!isoStr) return ''
-  const date = new Date(isoStr)
-  if (Number.isNaN(date.getTime())) return ''
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 export default function EditEventModal({
@@ -69,8 +62,8 @@ export default function EditEventModal({
         address: event.address || '',
         city: event.city || '',
         state: event.state || 'RS',
-        event_date: toDatetimeLocal(event.event_date),
-        event_end_date: toDatetimeLocal(event.event_end_date),
+        event_date: isoToBrazilLocal(event.event_date),
+        event_end_date: isoToBrazilLocal(event.event_end_date),
         ticket_price: event.ticket_price || '',
         whatsapp_info: event.whatsapp_info || '',
         facebook_url: event.facebook_url || '',
@@ -107,10 +100,8 @@ export default function EditEventModal({
       address: formData.address,
       city: formData.city,
       state: formData.state,
-      event_date: new Date(formData.event_date).toISOString(),
-      event_end_date: formData.event_end_date
-        ? new Date(formData.event_end_date).toISOString()
-        : undefined,
+      event_date: formData.event_date,
+      event_end_date: formData.event_end_date || undefined,
       ticket_price: formData.ticket_price,
       whatsapp_info: formData.whatsapp_info,
       facebook_url: formData.facebook_url,
